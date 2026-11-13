@@ -1,4 +1,4 @@
-<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><script src="data.js"></script><title>F1 Dashboard</title>
+<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><script src="data.js"></script><script src="ui2.js"></script><title>F1 Dashboard</title>
 <style>
 *{box-sizing:border-box}body{margin:0;background:#0b0b0e;color:#fff;font-family:Arial,Helvetica,sans-serif;padding:14px 18px}
 .top{display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #e10600;padding-bottom:8px;gap:10px;flex-wrap:wrap}
@@ -19,11 +19,25 @@ table{width:100%;border-collapse:collapse;font-size:14px}td,th{padding:5px 6px;b
 .warn{background:#3a2a00;color:#ffd27a;padding:8px 10px;border-radius:6px;margin:6px 0;font-size:14px}
 canvas{width:100%;height:200px;background:#101014;border-radius:6px}.small{font-size:12px;color:#9a9aa8}
 .loss{color:#ff6b6b;font-weight:700}.gain{color:#4ade80;font-weight:700}
-#mode button{background:#1c1c22;color:#fff;border:1px solid #333;padding:6px 12px;border-radius:5px;cursor:pointer}#mode button.sel{background:#fff;color:#000}</style></head><body>
-<div class="top"><h1><b>F1</b> Dashboard</h1><nav><button id="b1" class="on" onclick="tab(1)">En directo</button> <button id="b2" onclick="tab(2)">Ingeniero</button></nav><span id="mode"><button id="m1" onclick="setMode('live')">En directo</button> <button id="m2" onclick="setMode('demo')">Probar demo</button></span><span id="banner" class="wait">Sin conexión</span></div>
+#mode button{background:#1c1c22;color:#fff;border:1px solid #333;padding:6px 12px;border-radius:5px;cursor:pointer}#mode button.sel{background:#fff;color:#000}.tyres4{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-top:8px}.tcell{background:#202028;border-radius:8px;padding:10px}.tw{font-size:30px;font-weight:800}.secs{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.sec{border-radius:8px;padding:8px;text-align:center;color:#000}.sec b{font-size:20px}.sec .lbl{color:#222}nav{display:flex;gap:6px;flex-wrap:wrap}</style></head><body>
+<div class="top"><h1><b>F1</b> Dashboard</h1><nav><button id="b0" class="on" onclick="tab(0)">Conducción</button> <button id="b3" onclick="tab(3)">Carrera</button> <button id="b4" onclick="tab(4)">Coche</button> <button id="b2" onclick="tab(2)">Ingeniero</button> <button id="b5" onclick="tab(5)">Datos</button></nav><span id="mode"><button id="m1" onclick="setMode('live')">En directo</button> <button id="m2" onclick="setMode('demo')">Probar demo</button></span><span id="banner" class="wait">Sin conexión</span></div>
 <div id="livemsg" class="warn" style="display:none;margin:12px 0;line-height:1.5"><b>Sin conexión.</b> Esta página web no recibe datos del juego: el juego envía UDP y una web en GitHub Pages no puede recibirlo. Para el modo En directo hace falta un programa receptor en tu PC (o un móvil/tablet en la misma red) que lea la telemetría del juego. Esta versión aún no está conectada a ninguna partida y no inventa datos. Pulsa «Probar demo» para ver las pantallas con datos de ejemplo.</div>
 <div id="warn"></div>
-<div id="p1">
+<div id="p0"><div class="leds" id="leds2"></div>
+<div class="grid">
+<div class="card"><div class="lbl">Marcha · velocidad · rpm</div><div class="gear" id="d_gear">-</div><div class="row"><div><div class="lbl">km/h</div><div class="big" id="d_spd">-</div></div><div><div class="lbl">rpm</div><div class="big" id="d_rpm">-</div></div></div><div class="small" style="margin-top:6px">Fuente: Car Telemetry</div></div>
+<div class="card"><div class="lbl">Carrera</div><div class="big" id="d_lap">-</div><div class="big" id="d_pos" style="color:#ffd400">-</div><div class="lbl" style="margin-top:8px">Diferencia con tu mejor vuelta (en vivo)</div><div class="big" id="d_delta">-</div><div id="d_gaps" style="margin-top:6px"></div><div class="small" style="margin-top:6px">Fuente: Lap Data. La diferencia en vivo es un cálculo propio con tu mejor vuelta limpia.</div></div>
+<div class="card"><div class="lbl">Sectores y vueltas</div><div class="secs" id="d_sec"></div><div class="row" style="margin-top:10px"><div><div class="lbl">Última</div><div class="big" id="d_last" style="font-size:26px">-</div></div><div><div class="lbl">Mejor propia</div><div class="big" id="d_best" style="font-size:26px;color:#19c250">-</div></div></div><div class="small" style="margin-top:6px">Fuente: Lap Data / Session History. Verde = mejor propia vista en esta sesión, ámbar = más lenta. El morado (mejor global) solo aparece en la demo: Lap Data no lo trae.</div></div>
+<div class="card"><div class="lbl">Entradas · acelerador (verde) · freno (rojo) · volante (azul)</div><canvas id="cinp" style="height:150px"></canvas><div class="small">Últimos 12 s. Fuente: Car Telemetry.</div></div>
+<div class="card"><div class="lbl">Energía (ERS)</div><div class="big" id="d_ers">-</div><div class="small">Fuente: Car Status</div></div>
+<div class="card"><div class="lbl">Combustible</div><div class="big" id="d_fuel">-</div><div class="small">Fuente: Car Status</div></div>
+<div class="card"><div class="lbl">Aerodinámica y frenos</div><div id="d_aero" style="margin:8px 0"></div><div class="small">Fuente: Car Telemetry 2 / Car Status</div></div>
+<div class="card" style="grid-column:1/-1"><div class="lbl">Neumáticos y frenos por rueda</div><div id="d_tyres"></div><div class="small">Fuente: Car Telemetry (temperaturas) y Car Damage (desgaste)</div></div>
+</div><div class="small" style="margin-top:8px">Mapa del circuito: pendiente. Se dibujará con las posiciones que envíe el juego (Motion); no hay trazado verificado con licencia para publicar.</div></div>
+<div id="p3" style="display:none"><div class="grid"><div class="card" style="grid-column:span 2"><div class="lbl">Clasificación en carrera <span id="tw_n"></span></div><div id="d_tower"></div><div class="small">Fuente: Lap Data (24 coches) + Participants (nombres) + Car Status (neumático).</div></div><div class="card"><div class="lbl">Tiempo y previsión</div><div id="d_weather"></div><div class="small">Fuente: Session</div></div></div></div>
+<div id="p4" style="display:none"><div class="grid"><div class="card"><div class="lbl">Daños</div><div id="d_dmg"></div><div class="small">Fuente: Car Damage</div></div><div class="card"><div class="lbl">Desgaste de componentes del motor</div><div id="d_wear"></div><div class="small">Fuente: Car Damage</div></div><div class="card" style="grid-column:1/-1"><div class="lbl">Juegos de neumáticos</div><div id="d_sets"></div><div class="small">Fuente: Tyre Sets</div></div></div></div>
+<div id="p5" style="display:none"><div class="card"><div class="lbl">Qué datos da el juego (según la especificación de EA que he leído) y cómo se usan aquí</div><div id="d_inv" style="overflow-x:auto"></div><div class="small" style="margin-top:8px">Esto es lo que dice el documento oficial. Nada de esto está probado con el juego real. Con «Tu telemetría = Restringida» en multijugador, los datos de tu coche como combustible, ERS, daño y desgaste salen a cero para quien los lee. Los valores de las demás pantallas son simulados.</div></div></div>
+<div id="p1" style="display:none">
 <div class="leds" id="leds"></div>
 <div class="grid">
 <div class="card"><div class="lbl">Marcha · rpm · velocidad</div><div class="gear" id="gear">-</div>
@@ -47,15 +61,22 @@ canvas{width:100%;height:200px;background:#101014;border-radius:6px}.small{font-
 <script>
 var TK=(location.search.match(/t=([^&]+)/)||[])[1]||'';function api(p){return p+(TK?(p.indexOf('?')>0?'&':'?')+'t='+TK:'')}
 var MODE=(location.search.match(/modo=(demo)/)||[])[1]||'live';document.addEventListener('DOMContentLoaded',function(){document.getElementById(MODE=='demo'?'m2':'m1').className='sel'});function setMode(m){location.href=location.pathname+(m=='demo'?'?modo=demo':'')+(location.hash||'')}
-var cur=1,lapsKey='';function tab(n){if(MODE!='demo')return;cur=n;p1.style.display=n==1?'':'none';p2.style.display=n==2?'':'none';b1.className=n==1?'on':'';b2.className=n==2?'on':''}
-var $=function(i){return document.getElementById(i)},p1=$('p1'),p2=$('p2'),b1=$('b1'),b2=$('b2');
+var cur=0,lapsKey='';function tab(n){if(MODE!='demo'&&!window.__rx)return;cur=n;[0,2,3,4,5].forEach(function(k){document.getElementById('p'+k).style.display=k==n?'':'none';document.getElementById('b'+k).className=k==n?'on':''});var dd=window.__demo?(window.DEMO&&window.DEMO.state):(window.__rx&&window.RX);if(n==2&&dd){lapsKey='';render(dd)}if(n==3)UI2.renderRace();if(n==4)UI2.renderCar();if(n==5)UI2.renderInv();window.scrollTo(0,0)}
+var $=function(i){return document.getElementById(i)},p1=$('p1'),p2=$('p2'),b1=$('b1')||{},b2=$('b2');
 var L=$('leds');for(var i=0;i<15;i++){var d=document.createElement('div');d.className='led';L.appendChild(d)}
 var cols=function(i){return i<5?'#19c250':i<10?'#e10600':'#2f6bff'};
 function fmt(ms){if(!ms)return'-';var m=Math.floor(ms/60000),s=(ms%60000)/1000;return(m?m+':':'')+(m&&s<10?'0':'')+s.toFixed(3)}
 function ft(s){var m=Math.floor(s/60),x=s-m*60;return m+':'+(x<10?'0':'')+x.toFixed(3)}
 var comp={16:'C5',17:'C4',18:'C3',19:'C2',20:'C1',21:'C0',22:'C6',7:'Intermedio',8:'Lluvia'};
-async function poll(){if(MODE!='demo'){$('banner').className='wait';$('banner').textContent='Sin conexión';$('livemsg').style.display='';p1.style.display='none';p2.style.display='none';return}
- try{var d=window.DEMO.state;render(d)}catch(e){$('banner').className='wait';$('banner').textContent='No se pudo cargar la demo'}}
+var rxTimer=0;
+function offline(){window.__rx=false;$('banner').className='wait';$('banner').textContent='Sin conexión';$('livemsg').style.display='';[0,2,3,4,5].forEach(function(k){$('p'+k).style.display='none'});p1.style.display='none'}
+async function poll(){
+ if(MODE=='demo'){window.__demo=true;try{var d=window.DEMO.state;render(d);tab(cur)}catch(e){$('banner').className='wait';$('banner').textContent='No se pudo cargar la demo'}return}
+ try{var r=await fetch(api('/state'),{cache:'no-store'});var d=await r.json();if(!d||!d.live)throw 0;
+  var first=!window.__rx;window.__rx=true;window.RX=d;$('livemsg').style.display='none';render(d);
+  if(first){tab(cur)}else if(cur==3)UI2.renderRace();else if(cur==4)UI2.renderCar()}
+ catch(e){offline()}
+ clearTimeout(rxTimer);rxTimer=setTimeout(poll,600)}
 function render(d){var b=$('banner'),lv=d.live;
  if(d.simulated){b.className='sim';b.textContent='DATOS SIMULADOS · no es una partida real'}
  else if(d.age!==null&&d.age<3){b.className='live';b.textContent='Recibiendo del juego · formato '+d.fmt}
@@ -86,9 +107,9 @@ function renderHist(laps){var e=$('hist');if(!laps.length){e.innerHTML='<div cla
  var rows=laps.map(function(l){var d=best?l.time-best.time:0;return'<tr><td>V'+l.lap+'</td><td>'+ft(l.time)+'</td><td class="'+(d>0.0005?'loss':'gain')+'">'+(best?(d>0.0005?'+':'')+d.toFixed(3):'')+'</td><td class="small">'+((l.unclean&&l.unclean.length)?l.unclean.join(', '):(l.invalid?'inválida':''))+'</td></tr>'}).join('');
  e.innerHTML='<div class="card" style="margin-top:12px"><div class="lbl">Evolución vuelta a vuelta (gris = no limpia o inválida · ★ mejor limpia)</div>'+(Object.keys(types).length>1?'<div class="warn">Hay vueltas de varios tipos de sesión mezcladas.</div>':'')+'<canvas id="ch" style="height:170px"></canvas><table><tr><th>Vuelta</th><th>Tiempo</th><th>vs mejor</th><th>Nota</th></tr>'+rows+'</table></div>';
  var c=$('ch'),w=c.clientWidth,hh=170,dp=window.devicePixelRatio||1;c.width=w*dp;c.height=hh*dp;var g=c.getContext('2d');g.scale(dp,dp);
- var ts=laps.map(function(l){return l.time}),mn=Math.min.apply(0,ts)-1,mx=Math.max.apply(0,ts)+1,bw=Math.max(6,Math.min(40,(w-50)/laps.length-4));
+ var ts=laps.map(function(l){return l.time}),sp=Math.max.apply(0,ts)-Math.min.apply(0,ts),pd=Math.max(0.2,sp*0.25),mn=Math.min.apply(0,ts)-pd,mx=Math.max.apply(0,ts)+pd,bw=Math.max(6,Math.min(40,(w-50)/laps.length-4));
  g.font='11px Arial';g.fillStyle='#9a9aa8';g.fillText(ft(mx),2,12);g.fillText(ft(mn),2,hh-14);
- laps.forEach(function(l,i){var x=40+i*(bw+4),y=hh-18-(l.time-mn)/(mx-mn)*(hh-34);g.fillStyle=l.is_best?'#19c250':(l.invalid||(l.unclean&&l.unclean.length))?'#555':'#e10600';g.fillRect(x,y,bw,hh-18-y);g.fillStyle='#9a9aa8';g.fillText(l.lap,x,hh-4)})}
+ laps.forEach(function(l,i){var x=40+i*(bw+4),y=hh-18-(l.time-mn)/(mx-mn)*(hh-34);g.fillStyle=(l.invalid||(l.unclean&&l.unclean.length))?'#555':(l.is_best||(best&&l.time-best.time<0.0005))?'#19c250':'#e10600';g.fillRect(x,y,bw,hh-18-y);g.fillStyle='#9a9aa8';g.fillText(l.lap,x,hh-4)})}
 function fillLaps(laps){renderHist(laps);var a=$('la'),r=$('lr'),av=a.value,rv=r.value;
  var opt=function(l){return'<option value="'+l.id+'">V'+l.lap+' · '+ft(l.time)+(l.is_best?' ★ mejor':'')+(l.invalid?' (inválida)':'')+(l.unclean&&l.unclean.length?' (no limpia)':'')+'</option>'};
  a.innerHTML=laps.map(opt).join('');r.innerHTML=laps.map(opt).join('');
@@ -108,8 +129,8 @@ async function run(){var a=$('la').value,r=$('lr').value;if(a===''||r==='')retur
  h+=''+secTable(d)+'<div class="card" style="margin-top:12px"><div class="lbl">Donde más pierdes (tramos de 100 m)</div><table><tr><th>Tramo</th><th>Pierdes</th><th>Qué dicen los datos</th></tr>'+d.worst.map(row).join('')+'</table></div>';
  h+='<div class="card" style="margin-top:12px"><div class="lbl">Donde más ganas</div><table>'+d.best.map(row).join('')+'</table><div class="small" style="margin-top:8px">Esto muestra DONDE cambia el tiempo y qué hacían freno, velocidad mínima y gas. No dice la causa por sí solo: la lectura final es tuya.</div></div>';
  e.innerHTML=h;chart('c1',d.x,[{y:d.delta,c:'#e10600'}],true);chart('c2',d.x,[{y:d.speed_r,c:'#777'},{y:d.speed_a,c:'#e10600'}],false);map(d)}
-function map(d){var c=$('c3'),w=c.clientWidth,h=260,dp=window.devicePixelRatio||1;c.width=w*dp;c.height=h*dp;var g=c.getContext('2d');g.scale(dp,dp);
- var xs=d.wx,zs=d.wz;if(!xs.length||(Math.max.apply(0,xs)==Math.min.apply(0,xs)&&Math.max.apply(0,zs)==Math.min.apply(0,zs))){g.fillStyle='#9a9aa8';g.fillText('Mapa pendiente: posiciones reales del juego',10,20);return}
+function map(d){var c=$('c3');var nm=$('c3note');if(!nm){nm=document.createElement('div');nm.id='c3note';nm.className='small';c.parentNode.appendChild(nm)}c.style.display='';nm.textContent='';var w=c.clientWidth,h=260,dp=window.devicePixelRatio||1;c.width=w*dp;c.height=h*dp;var g=c.getContext('2d');g.scale(dp,dp);
+ var xs=d.wx,zs=d.wz;if(!xs.length||(Math.max.apply(0,xs)==Math.min.apply(0,xs)&&Math.max.apply(0,zs)==Math.min.apply(0,zs))){c.style.display='none';nm.textContent='Mapa pendiente: aún no hay posiciones reales del juego para dibujar el circuito.';return}
  var x0=Math.min.apply(0,xs),x1=Math.max.apply(0,xs),z0=Math.min.apply(0,zs),z1=Math.max.apply(0,zs),sc=Math.min((w-30)/(x1-x0||1),(h-30)/(z1-z0||1));
  var X=function(v){return 15+(v-x0)*sc},Y=function(v){return 15+(v-z0)*sc};g.lineWidth=5;g.lineCap='round';
  var k=Math.round(100/5);for(var i=0;i<xs.length-1;i++){if((xs[i]==0&&zs[i]==0)||(xs[i+1]==0&&zs[i+1]==0))continue;var j=Math.floor(i/k)*k,e=Math.min(j+k,d.delta.length-1),ls=d.delta[e]-d.delta[j];
@@ -128,5 +149,5 @@ function chart(id,x,ser,zero){var c=$(id),w=c.clientWidth,h=200,dp=window.device
  if(zero){g.beginPath();g.moveTo(36,Y(0));g.lineTo(w-10,Y(0));g.stroke()}
  g.fillText(mx.toFixed(zero?2:0),2,12);g.fillText(mn.toFixed(zero?2:0),2,h-18);g.fillText(x[x.length-1]+' m',w-60,h-3);g.fillText('0 m',36,h-3);
  ser.forEach(function(s){g.strokeStyle=s.c;g.lineWidth=2;g.beginPath();s.y.forEach(function(v,i){i?g.lineTo(X(x[i]),Y(v)):g.moveTo(X(x[i]),Y(v))});g.stroke()})}
-if(location.hash.indexOf('#eng')==0)tab(2);poll();
+if(location.hash.indexOf('#eng')==0)cur=2;var hm=location.hash.match(/#t(\d)/);if(hm)cur=+hm[1];tab(cur);poll();
 </script></body></html>
