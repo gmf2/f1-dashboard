@@ -1,0 +1,132 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><script src="data.js"></script><title>F1 Dashboard</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#0b0b0e;color:#fff;font-family:Arial,Helvetica,sans-serif;padding:14px 18px}
+.top{display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #e10600;padding-bottom:8px;gap:10px;flex-wrap:wrap}
+h1{font-size:20px;margin:0;letter-spacing:2px;text-transform:uppercase}h1 b{color:#e10600}
+nav button{background:#1c1c22;color:#fff;border:1px solid #333;padding:8px 16px;border-radius:5px;font-size:15px;cursor:pointer}nav button.on{background:#e10600;border-color:#e10600}
+#banner{padding:6px 12px;border-radius:4px;font-weight:700;font-size:13px}.sim{background:#ffd400;color:#000}.live{background:#0f5132;color:#9ff0c2}.wait{background:#444}
+.leds{display:flex;gap:6px;margin:12px 0}.led{flex:1;height:24px;border-radius:12px;background:#222}
+.card{background:#16161b;border:1px solid #2a2a33;border-radius:8px;padding:12px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px}
+.lbl{font-size:12px;color:#9a9aa8;text-transform:uppercase;letter-spacing:1px}
+.gear{font-size:130px;font-weight:800;line-height:1;text-align:center}.big{font-size:36px;font-weight:700}
+.row{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.bar{height:14px;background:#26262e;border-radius:7px;overflow:hidden;margin:4px 0 10px}.bar i{display:block;height:100%}
+.tyres{display:grid;grid-template-columns:1fr 1fr;gap:6px;width:200px;margin:8px auto}.t{background:#2a2a33;border-radius:6px;padding:8px;text-align:center;font-size:19px;font-weight:700}
+.pill{padding:3px 9px;border-radius:10px;font-size:13px;font-weight:700;display:inline-block;margin:2px 4px 2px 0;background:#444}
+select{background:#1c1c22;color:#fff;border:1px solid #333;padding:6px;border-radius:5px;font-size:15px}
+table{width:100%;border-collapse:collapse;font-size:14px}td,th{padding:5px 6px;border-bottom:1px solid #26262e;text-align:left}
+.warn{background:#3a2a00;color:#ffd27a;padding:8px 10px;border-radius:6px;margin:6px 0;font-size:14px}
+canvas{width:100%;height:200px;background:#101014;border-radius:6px}.small{font-size:12px;color:#9a9aa8}
+.loss{color:#ff6b6b;font-weight:700}.gain{color:#4ade80;font-weight:700}
+#mode button{background:#1c1c22;color:#fff;border:1px solid #333;padding:6px 12px;border-radius:5px;cursor:pointer}#mode button.sel{background:#fff;color:#000}</style></head><body>
+<div class="top"><h1><b>F1</b> Dashboard</h1><nav><button id="b1" class="on" onclick="tab(1)">En directo</button> <button id="b2" onclick="tab(2)">Ingeniero</button></nav><span id="mode"><button id="m1" onclick="setMode('live')">En directo</button> <button id="m2" onclick="setMode('demo')">Probar demo</button></span><span id="banner" class="wait">Sin conexión</span></div>
+<div id="livemsg" class="warn" style="display:none;margin:12px 0;line-height:1.5"><b>Sin conexión.</b> Esta página web no recibe datos del juego: el juego envía UDP y una web en GitHub Pages no puede recibirlo. Para el modo En directo hace falta un programa receptor en tu PC (o un móvil/tablet en la misma red) que lea la telemetría del juego. Esta versión aún no está conectada a ninguna partida y no inventa datos. Pulsa «Probar demo» para ver las pantallas con datos de ejemplo.</div>
+<div id="warn"></div>
+<div id="p1">
+<div class="leds" id="leds"></div>
+<div class="grid">
+<div class="card"><div class="lbl">Marcha · rpm · velocidad</div><div class="gear" id="gear">-</div>
+<div class="row"><div><div class="lbl">rpm</div><div class="big" id="rpm">-</div></div><div><div class="lbl">km/h</div><div class="big" id="spd">-</div></div></div>
+<div class="lbl" style="margin-top:8px">Acelerador</div><div class="bar"><i id="thr" style="background:#19c250;width:0"></i></div>
+<div class="lbl">Freno</div><div class="bar"><i id="brk" style="background:#e10600;width:0"></i></div></div>
+<div class="card"><div class="lbl">Energía y aerodinámica activa</div><div id="pills" style="margin:8px 0"></div>
+<div class="lbl">Batería ERS (energía almacenada)</div><div class="big" id="ers">-</div>
+<div class="lbl" style="margin-top:8px">Neumáticos · temperatura superficie</div><div class="tyres" id="tyres"></div>
+<div class="row"><span class="lbl" id="tyreinfo">-</span><span class="lbl" id="fuel">-</span></div></div>
+<div class="card"><div class="lbl">Vuelta · sectores · rivales</div><div class="row"><div class="big" id="lapt">-</div><span class="lbl" id="lapn">-</span></div>
+<table><tr><td>S1</td><td id="s1">-</td></tr><tr><td>S2</td><td id="s2">-</td></tr></table>
+<div class="lbl" style="margin-top:8px" id="front">-</div><div class="lbl" id="posl">-</div></div>
+<div class="card"><div class="lbl">Coches en pista (posición enviada por el juego)</div><canvas id="live" style="height:220px"></canvas><div class="small" id="carsn"></div></div>
+</div></div>
+<div id="p2" style="display:none">
+<div class="card"><div class="row" style="justify-content:flex-start;gap:14px;flex-wrap:wrap">
+<label class="lbl">Tu vuelta <select id="la"></select></label><label class="lbl">Referencia <select id="lr"></select></label>
+<button onclick="prevRef()" style="background:#1c1c22;color:#fff;border:1px solid #333;padding:6px 10px;border-radius:5px">Referencia = vuelta anterior</button><span class="small" id="engnote">Se comparan vueltas de la misma sesión midiendo el tiempo a cada distancia de pista.</span></div></div>
+<div id="hist"></div><div id="eng"></div></div>
+<script>
+var TK=(location.search.match(/t=([^&]+)/)||[])[1]||'';function api(p){return p+(TK?(p.indexOf('?')>0?'&':'?')+'t='+TK:'')}
+var MODE=(location.search.match(/modo=(demo)/)||[])[1]||'live';document.addEventListener('DOMContentLoaded',function(){document.getElementById(MODE=='demo'?'m2':'m1').className='sel'});function setMode(m){location.href=location.pathname+(m=='demo'?'?modo=demo':'')+(location.hash||'')}
+var cur=1,lapsKey='';function tab(n){if(MODE!='demo')return;cur=n;p1.style.display=n==1?'':'none';p2.style.display=n==2?'':'none';b1.className=n==1?'on':'';b2.className=n==2?'on':''}
+var $=function(i){return document.getElementById(i)},p1=$('p1'),p2=$('p2'),b1=$('b1'),b2=$('b2');
+var L=$('leds');for(var i=0;i<15;i++){var d=document.createElement('div');d.className='led';L.appendChild(d)}
+var cols=function(i){return i<5?'#19c250':i<10?'#e10600':'#2f6bff'};
+function fmt(ms){if(!ms)return'-';var m=Math.floor(ms/60000),s=(ms%60000)/1000;return(m?m+':':'')+(m&&s<10?'0':'')+s.toFixed(3)}
+function ft(s){var m=Math.floor(s/60),x=s-m*60;return m+':'+(x<10?'0':'')+x.toFixed(3)}
+var comp={16:'C5',17:'C4',18:'C3',19:'C2',20:'C1',21:'C0',22:'C6',7:'Intermedio',8:'Lluvia'};
+async function poll(){if(MODE!='demo'){$('banner').className='wait';$('banner').textContent='Sin conexión';$('livemsg').style.display='';p1.style.display='none';p2.style.display='none';return}
+ try{var d=window.DEMO.state;render(d)}catch(e){$('banner').className='wait';$('banner').textContent='No se pudo cargar la demo'}}
+function render(d){var b=$('banner'),lv=d.live;
+ if(d.simulated){b.className='sim';b.textContent='DATOS SIMULADOS · no es una partida real'}
+ else if(d.age!==null&&d.age<3){b.className='live';b.textContent='Recibiendo del juego · formato '+d.fmt}
+ else{b.className='wait';b.textContent='Esperando datos del juego…'}
+ var w=[];if(lv.warning)w.push(lv.warning);if(d.fmt&&d.fmt!=2026)w.push('El juego envía formato UDP '+d.fmt+'; este programa lee 2026. Cambia "UDP Format" en el juego.');
+ $('warn').innerHTML=w.map(function(x){return'<div class="warn">'+x+'</div>'}).join('');
+ var t=lv.tel;if(t){$('gear').textContent=t.gear<0?'R':t.gear==0?'N':t.gear;$('rpm').textContent=t.rpm;$('spd').textContent=t.speed;
+  $('thr').style.width=(t.throttle*100)+'%';$('brk').style.width=(t.brake*100)+'%';
+  var k=L.children;for(var i=0;i<15;i++)k[i].style.background=(t.rev_bits>>i)&1?cols(i):'#222';
+  $('tyres').innerHTML=[2,3,0,1].map(function(i){return'<div class="t">'+t.tyre_surf[i]+'°</div>'}).join('')}
+ var s=lv.status,t2=lv.t2,p='';
+ if(t2){p+='<span class="pill" style="background:#2f6bff">AERO: '+(t2.aero_mode?'RECTA':'CURVA')+(t2.aero_avail?'':' (no disponible)')+'</span>';
+  p+='<span class="pill" style="background:'+(t2.boost_active?'#e10600':'#444')+'">OVERTAKE '+(t2.boost_active?'ACTIVO':t2.boost_avail?'disponible':t2.boost_dist?'en '+t2.boost_dist+' m':'no disponible')+'</span>'}
+ if(s){var m=['ninguno','medio','vuelta rápida','boost'];p+='<span class="pill">Modo ERS: '+(m[s.ers_mode]||s.ers_mode)+'</span>';
+  $('ers').textContent=(s.ers_j/1e6).toFixed(2)+' MJ';$('tyreinfo').textContent=(comp[s.comp]||'compuesto ?')+' · '+s.tyre_age+' vueltas';$('fuel').textContent='Combustible: '+(s.fuel_laps>=0?'+':'')+s.fuel_laps.toFixed(1)+' vueltas'}
+ $('pills').innerHTML=p;
+ var l=lv.lap;if(l){$('lapt').textContent=fmt(l.cur_ms);var T=lv.track,tl=T&&T.is_race&&T.total_laps>0?' de '+T.total_laps:'';$('lapn').textContent=(T?T.name+' · ':'')+'Vuelta '+l.lap+tl;$('s1').textContent=fmt(l.s1);$('s2').textContent=fmt(l.s2);
+  $('front').textContent='Delante: '+(l.front?'+'+(l.front/1000).toFixed(3)+' s':'-');$('posl').textContent='Posición: '+l.pos}
+ PL=lv.player;NOTE=lv.track_note||'';livemap(lv.cars||[]);var key=JSON.stringify(d.laps);if(key!==lapsKey){lapsKey=key;fillLaps(d.laps)}}
+var trail=[],PL=null,NOTE='';function livemap(cars){var c=$('live'),w=c.clientWidth,h=220,dp=window.devicePixelRatio||1;c.width=w*dp;c.height=h*dp;var g=c.getContext('2d');g.scale(dp,dp);
+ $('carsn').textContent=cars.length?cars.length+' coches con posición · rojo = tu coche (índice '+PL+' según el juego), gris = otros':'Sin posiciones recibidas';
+ cars.forEach(function(p){if(p[0]==PL)trail.push(p)});if(trail.length>4000)trail=trail.slice(-4000);if(!trail.length)return;
+ var all=trail.concat(cars),xs=all.map(function(p){return p[1]}),zs=all.map(function(p){return p[2]}),x0=Math.min.apply(0,xs),x1=Math.max.apply(0,xs),z0=Math.min.apply(0,zs),z1=Math.max.apply(0,zs),sc=Math.min((w-30)/(x1-x0||1),(h-30)/(z1-z0||1));
+ var X=function(v){return 15+(v-x0)*sc},Y=function(v){return 15+(v-z0)*sc};g.fillStyle='#3a3a44';trail.forEach(function(p){g.fillRect(X(p[1]),Y(p[2]),2,2)});
+ cars.forEach(function(p){g.fillStyle=p[0]==PL?'#e10600':'#aaa';g.beginPath();g.arc(X(p[1]),Y(p[2]),p[0]==PL?6:4,0,7);g.fill()})}
+function renderHist(laps){var e=$('hist');if(!laps.length){e.innerHTML='<div class="card" style="margin-top:12px"><div class="lbl">Evolución vuelta a vuelta</div><div class="small">Aún no hay vueltas completas registradas.</div></div>';return}
+ var best=laps.filter(function(l){return l.is_best})[0],types={};laps.forEach(function(l){types[l.stype]=1});
+ var rows=laps.map(function(l){var d=best?l.time-best.time:0;return'<tr><td>V'+l.lap+'</td><td>'+ft(l.time)+'</td><td class="'+(d>0.0005?'loss':'gain')+'">'+(best?(d>0.0005?'+':'')+d.toFixed(3):'')+'</td><td class="small">'+((l.unclean&&l.unclean.length)?l.unclean.join(', '):(l.invalid?'inválida':''))+'</td></tr>'}).join('');
+ e.innerHTML='<div class="card" style="margin-top:12px"><div class="lbl">Evolución vuelta a vuelta (gris = no limpia o inválida · ★ mejor limpia)</div>'+(Object.keys(types).length>1?'<div class="warn">Hay vueltas de varios tipos de sesión mezcladas.</div>':'')+'<canvas id="ch" style="height:170px"></canvas><table><tr><th>Vuelta</th><th>Tiempo</th><th>vs mejor</th><th>Nota</th></tr>'+rows+'</table></div>';
+ var c=$('ch'),w=c.clientWidth,hh=170,dp=window.devicePixelRatio||1;c.width=w*dp;c.height=hh*dp;var g=c.getContext('2d');g.scale(dp,dp);
+ var ts=laps.map(function(l){return l.time}),mn=Math.min.apply(0,ts)-1,mx=Math.max.apply(0,ts)+1,bw=Math.max(6,Math.min(40,(w-50)/laps.length-4));
+ g.font='11px Arial';g.fillStyle='#9a9aa8';g.fillText(ft(mx),2,12);g.fillText(ft(mn),2,hh-14);
+ laps.forEach(function(l,i){var x=40+i*(bw+4),y=hh-18-(l.time-mn)/(mx-mn)*(hh-34);g.fillStyle=l.is_best?'#19c250':(l.invalid||(l.unclean&&l.unclean.length))?'#555':'#e10600';g.fillRect(x,y,bw,hh-18-y);g.fillStyle='#9a9aa8';g.fillText(l.lap,x,hh-4)})}
+function fillLaps(laps){renderHist(laps);var a=$('la'),r=$('lr'),av=a.value,rv=r.value;
+ var opt=function(l){return'<option value="'+l.id+'">V'+l.lap+' · '+ft(l.time)+(l.is_best?' ★ mejor':'')+(l.invalid?' (inválida)':'')+(l.unclean&&l.unclean.length?' (no limpia)':'')+'</option>'};
+ a.innerHTML=laps.map(opt).join('');r.innerHTML=laps.map(opt).join('');
+ var best=laps.filter(function(l){return l.is_best})[0];
+ a.value=av!==''&&laps[av]?av:(laps.length?laps[laps.length-1].id:'');r.value=rv!==''&&laps[rv]?rv:(best?best.id:'');
+ var pr=location.hash.match(/#eng:(\d+):(\d+)/);if(pr&&laps[pr[1]]&&laps[pr[2]]&&!window.pdone){a.value=pr[1];r.value=pr[2];window.pdone=1}
+ if(laps.length>1)run()}
+$('la').onchange=$('lr').onchange=run;
+function prevRef(){var a=+$('la').value;if(a>0){$('lr').value=a-1;run()}}
+async function run(){var a=$('la').value,r=$('lr').value;if(a===''||r==='')return;
+ var d=window.DEMO&&window.DEMO.cmp[a+'_'+r];if(!d){$('eng').innerHTML='<div class="warn">En esta demo solo están las comparaciones de cada vuelta con la anterior y con la V1.</div>';return}d=JSON.parse(JSON.stringify(d));d.wx=d.x.map(function(){return 0});d.wz=d.wx;var e=$('eng');
+ if(d.error){e.innerHTML='<div class="warn">'+d.error+'</div>';return}
+ if(a===r){e.innerHTML='<div class="warn">Elige dos vueltas distintas.</div>';return}
+ var h='<div class="card" style="margin-top:12px"><div class="row"><div class="big '+(d.total>0?'loss':'gain')+'">'+(d.total>0?'+':'')+d.total.toFixed(3)+' s</div><span class="lbl">frente a la referencia</span></div>';
+ h+=d.caveats.map(function(c){return'<div class="warn">'+c+'</div>'}).join('')+'</div>';
+ h+='<div class="grid" style="margin-top:12px"><div class="card"><div class="lbl">Diferencia acumulada (s) por distancia · arriba = pierdes</div><canvas id="c1"></canvas></div><div class="card"><div class="lbl">Velocidad: tú (rojo) · referencia (gris)</div><canvas id="c2"></canvas></div><div class="card"><div class="lbl">Mapa: rojo pierdes · verde ganas (tramos de 100 m)</div><canvas id="c3" style="height:260px"></canvas><div class="small">Trazado dibujado con las posiciones en pista que envía el juego (depende de que las envíe). '+NOTE+'</div></div></div>';
+ h+=''+secTable(d)+'<div class="card" style="margin-top:12px"><div class="lbl">Donde más pierdes (tramos de 100 m)</div><table><tr><th>Tramo</th><th>Pierdes</th><th>Qué dicen los datos</th></tr>'+d.worst.map(row).join('')+'</table></div>';
+ h+='<div class="card" style="margin-top:12px"><div class="lbl">Donde más ganas</div><table>'+d.best.map(row).join('')+'</table><div class="small" style="margin-top:8px">Esto muestra DONDE cambia el tiempo y qué hacían freno, velocidad mínima y gas. No dice la causa por sí solo: la lectura final es tuya.</div></div>';
+ e.innerHTML=h;chart('c1',d.x,[{y:d.delta,c:'#e10600'}],true);chart('c2',d.x,[{y:d.speed_r,c:'#777'},{y:d.speed_a,c:'#e10600'}],false);map(d)}
+function map(d){var c=$('c3'),w=c.clientWidth,h=260,dp=window.devicePixelRatio||1;c.width=w*dp;c.height=h*dp;var g=c.getContext('2d');g.scale(dp,dp);
+ var xs=d.wx,zs=d.wz;if(!xs.length||(Math.max.apply(0,xs)==Math.min.apply(0,xs)&&Math.max.apply(0,zs)==Math.min.apply(0,zs))){g.fillStyle='#9a9aa8';g.fillText('Mapa pendiente: posiciones reales del juego',10,20);return}
+ var x0=Math.min.apply(0,xs),x1=Math.max.apply(0,xs),z0=Math.min.apply(0,zs),z1=Math.max.apply(0,zs),sc=Math.min((w-30)/(x1-x0||1),(h-30)/(z1-z0||1));
+ var X=function(v){return 15+(v-x0)*sc},Y=function(v){return 15+(v-z0)*sc};g.lineWidth=5;g.lineCap='round';
+ var k=Math.round(100/5);for(var i=0;i<xs.length-1;i++){if((xs[i]==0&&zs[i]==0)||(xs[i+1]==0&&zs[i+1]==0))continue;var j=Math.floor(i/k)*k,e=Math.min(j+k,d.delta.length-1),ls=d.delta[e]-d.delta[j];
+  g.strokeStyle=Math.abs(ls)<0.005?'#666':ls>0?'#e10600':'#19c250';g.beginPath();g.moveTo(X(xs[i]),Y(zs[i]));g.lineTo(X(xs[i+1]),Y(zs[i+1]));g.stroke()}}
+
+function secTable(d){if(!d.sectors||!d.sectors.length)return'<div class="warn">Sin tiempos de sector completos en estas vueltas.</div>';return'<div class="card" style="margin-top:12px"><div class="lbl">Por sector (tú · referencia · diferencia)</div><table>'+d.sectors.map(function(s){return'<tr><td>'+s.name+'</td><td>'+s.a.toFixed(3)+'</td><td>'+s.r.toFixed(3)+'</td><td class="'+(s.d>0?'loss':'gain')+'">'+(s.d>0?'+':'')+s.d.toFixed(3)+' s</td></tr>'}).join('')+'</table></div>'}
+function row(s){var t=[];
+ if(s.brake_start_a!==null&&s.brake_start_r!==null&&s.brake_start_a!==s.brake_start_r){var df=s.brake_start_a-s.brake_start_r;t.push('Empiezas a frenar '+Math.abs(df)+' m '+(df<0?'antes':'después')+' que la referencia')}
+ var dv=s.min_speed_a-s.min_speed_r;if(Math.abs(dv)>=2)t.push('Velocidad mínima '+Math.abs(dv)+' km/h '+(dv<0?'menor':'mayor')+' ('+s.min_speed_a+' vs '+s.min_speed_r+')');
+ var dt=s.full_throttle_a-s.full_throttle_r;if(Math.abs(dt)>=3)t.push('Gas a fondo '+Math.abs(dt*5)+' m '+(dt<0?'menos':'más'));
+ return'<tr><td>'+s.start+'–'+s.end+' m</td><td class="'+(s.loss>0?'loss':'gain')+'">'+(s.loss>0?'+':'')+s.loss.toFixed(3)+' s</td><td>'+(t.join('; ')||'Sin diferencia clara en freno, velocidad mínima ni gas')+'</td></tr>'}
+function chart(id,x,ser,zero){var c=$(id),w=c.clientWidth,h=200,dp=window.devicePixelRatio||1;c.width=w*dp;c.height=h*dp;var g=c.getContext('2d');g.scale(dp,dp);
+ var all=[].concat.apply([],ser.map(function(s){return s.y})),mn=Math.min.apply(0,all.concat(zero?[0]:[])),mx=Math.max.apply(0,all.concat(zero?[0]:[]));if(mx==mn)mx=mn+1;
+ var X=function(v){return 36+(v-x[0])/(x[x.length-1]-x[0])*(w-46)},Y=function(v){return h-18-(v-mn)/(mx-mn)*(h-30)};
+ g.strokeStyle='#2a2a33';g.fillStyle='#9a9aa8';g.font='11px Arial';
+ if(zero){g.beginPath();g.moveTo(36,Y(0));g.lineTo(w-10,Y(0));g.stroke()}
+ g.fillText(mx.toFixed(zero?2:0),2,12);g.fillText(mn.toFixed(zero?2:0),2,h-18);g.fillText(x[x.length-1]+' m',w-60,h-3);g.fillText('0 m',36,h-3);
+ ser.forEach(function(s){g.strokeStyle=s.c;g.lineWidth=2;g.beginPath();s.y.forEach(function(v,i){i?g.lineTo(X(x[i]),Y(v)):g.moveTo(X(x[i]),Y(v))});g.stroke()})}
+if(location.hash.indexOf('#eng')==0)tab(2);poll();
+</script></body></html>
