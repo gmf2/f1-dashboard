@@ -211,6 +211,18 @@ function recentLapsReport(n){
     parts.push('Diferencia entre las 2 vueltas disponibles: '+(d>0?'+':'')+d.toFixed(3)+' s. Una media por vuelta y por sectores con mas historial llegaria con los datos reales.');}
   mem.lastIntent='recent';mem.lastDeps=['jefe','telemetria'];
   return parts.join(' ');}
+function brakeReport(subject,lap){
+  lap=lap||1;var who=subjName(subject),rows=[];
+  window.TRACK_MONZA.corners.forEach(function(c){
+    var me=AN.cornerStats(traceOf('you',lap),c,DS,prevExitOf(c.n));
+    var ot=AN.cornerStats(traceOf(subject,lap),c,DS,prevExitOf(c.n));
+    if(me.brake==null&&ot.brake==null)return;
+    var s='curva '+c.n+' ('+c.name+'): tu al metro '+(me.brake!=null?me.brake:'-')+', '+who+' '+(ot.brake!=null?('al '+ot.brake):'sin frenada clara');
+    if(me.brake!=null&&ot.brake!=null&&Math.abs(ot.brake-me.brake)>=5)s+=ot.brake>me.brake?' ('+who+' frena unos '+(ot.brake-me.brake)+' m mas tarde)':' (tu frenas unos '+(me.brake-ot.brake)+' m mas tarde)';
+    rows.push(s);});
+  mem.lastIntent='brakes';mem.subject=subject;mem.lap=lap;mem.lastDeps=['jefe','telemetria'];
+  if(!rows.length)return 'En la vuelta '+lap+' contra '+who+' no hay frenadas claras medidas.';
+  return 'Puntos de frenada medidos en la vuelta '+lap+' contra '+who+' (precision de unos 10 m; el metro exacto no lo mido): '+rows.join('; ')+'.';}
 function bestCornerReport(subject,lap){
   var bt=bestCornerData(subject,lap);
   mem.lastIntent='best';mem.subject=subject;mem.lap=lap;
@@ -248,13 +260,18 @@ function route(raw){
   if(/boost|\bers\b|energia|bateria|despliegue/.test(t)){
     mem.lastIntent='ers';mem.lastDeps=['jefe'];
     return 'La energia (ERS/boost) no esta en las trazas de esta demo. El protocolo del juego expone la energia almacenada y el modo de despliegue de tu coche (el de los rivales online puede venir restringido por su configuracion), asi que con la APK seria calculable para atacar o defender; ahora no puedo decirte cuanta tienes.';}
+  if(/\b(gano|ganas|ganar)\b/.test(t)&&/\b(pierd\w*|perd\w*)\b/.test(t)){
+    var cs2=/detras/.test(t)?'rivalB':/delante|rival/.test(t)?'rival':(mem.subject||'ref');
+    var cl2=pickLap(t)||mem.lap||1;
+    return bestCornerReport(cs2,cl2)+' '+worstCorner(cs2,cl2);}
   if(/donde (me )?(gana|recorta) el de detras|donde gana tiempo el de detras/.test(t)){
     mem.subject='rivalB';return worstCorner('rivalB',pickLap(t)||mem.lap||1);}
-  if(/mejor curva|donde gano mas|donde soy mas rapido/.test(t)){
-    return bestCornerReport(mem.subject||'ref',pickLap(t)||mem.lap||1);}
+  if(/mejor curva|donde gano( mas| tiempo)?\b|donde soy mas rapido|\b(gano|ganas|ganar)\b[^a-z]{0,15}\btiempo\b/.test(t)){
+    var bs=/detras/.test(t)?'rivalB':/delante|rival/.test(t)?'rival':(mem.subject||'ref');
+    return bestCornerReport(bs,pickLap(t)||mem.lap||1);}
   if(/mi peor curva|peor curva/.test(t)){
     var sub2=mem.subject||'ref';return worstCorner(sub2,pickLap(t)||mem.lap||1);}
-  if(/^(hola|buenas|ey|buenos dias|buenas tardes)/.test(t)||(/^que tal/.test(t)&&!/curva|vuelta|pierd|frena|tramo|diferencia|mapa/.test(t)))return 'Hola. Puedo analizar tus vueltas de Monza (demo): frenadas, velocidades y donde ganas o pierdes contra la referencia o el de delante. Preguntame, por ejemplo: "donde pierdo mas?" o "frena antes el de delante en la 3?".';
+  if((/^(hola|buenas|ey|buenos dias|buenas tardes)/.test(t)||/^que tal/.test(t))&&!/curva|vuelta|pierd|perd|gano|gana|frena|tramo|diferencia|mapa|sector|donde|tiempo|rival|delante|detras|rapido|lento|gap|ventaja/.test(t))return 'Hola. Puedo analizar tus vueltas de Monza (demo): frenadas, velocidades y donde ganas o pierdes contra la referencia o el de delante. Preguntame, por ejemplo: "donde pierdo mas?" o "frena antes el de delante en la 3?".';
   if(/gracias/.test(t))return 'De nada. Seguimos cuando quieras.';
   if(/^(estas ahi|me oyes|sigues ahi|estas)[?]?$/.test(t))return 'Si, aqui estoy, en el muro. Que miramos: curvas, sectores o rivales?';
   if(/(adios|hasta luego|nos vemos)/.test(t))return 'Hasta luego. La proxima sesion la analizamos igual.';
@@ -279,7 +296,7 @@ function route(raw){
   if(n===null&&mem.sector&&/^y (el )?\d{1,2}[?]?$/.test(t)){var msn=parseInt(t.match(/\d{1,2}/)[0]);mem.sector=msn;return sectorReport(msn,subject,lap);}
   if(n===null&&mem.sector&&/^(y )?(con |contra )?(el de (delante|detras)|la referencia|el rival)[?]?$/.test(t))return sectorReport(mem.sector,subject,lap);
   if(/compara.*vuelta|vuelta 2.*vuelta 1|vuelta 1.*vuelta 2|vuelta 2.*(respecto|contra)/.test(t))return lapCompare();
-  if(n===null&&lap!==null&&mem.corner&&/^(y )?(tu )?((en|con) )?(la )?vuelta \d+( ahi)?[?]?$/.test(t))return cornerReport(mem.corner,mem.subject||'ref',lap);
+  if(n===null&&lap!==null&&mem.corner&&/^(y )?(eso )?(tu )?((en|con) )?(la )?vuelta \d+( ahi)?[?]?$/.test(t))return cornerReport(mem.corner,mem.subject||'ref',lap);
   if(n===null){
     if(/defiendo|defender|defenderse|mantener la posicion|me adelanta/.test(t))return defenseReport(lap);
     var advQ=/^(que|k) (puedo|podria) (hacer|cambiar|mejorar)|^(que|k) hago|consej|recomiend|sugerenc|como (le )?(recorto|recorte|gano|cojo|cazo|adelanto)|como (puedo )?(ir|ser) mas rapido|aumentar|sacar?le? mas tiempo|saco mas tiempo|mejorar mi ritmo/.test(t);
@@ -306,6 +323,7 @@ function route(raw){
       if(mem.lastIntent==='advice')return adviceReport(ns,lap);
       if(mem.lastIntent==='worst')return worstCorner(ns,lap);
       if(mem.lastIntent==='best')return bestCornerReport(ns,lap);
+      if(mem.lastIntent==='brakes')return brakeReport(ns,lap);
       if(mem.lastIntent==='defense')return defenseReport(lap);
       if(mem.lastIntent==='sector'&&mem.sector)return sectorReport(mem.sector,ns,lap);
       if(mem.corner)return cornerReport(mem.corner,ns,lap);
@@ -317,8 +335,11 @@ function route(raw){
   if(/\b(pierd\w*|perd\w*)\b.*\btiempo\b|\btiempo\b.*\b(pierd\w*|perd\w*)\b/.test(t))return worstCorner(subject,lap);
   if(/\b(estoy|estas|sigo|vengo)\s+perdiendo\b/.test(t))return worstCorner(subject,lap);
   if(/\bmas lento\b|se me (va|escapa)( el)? tiempo/.test(t))return worstCorner(subject,lap);
-  if(/(donde pierdo|mayor perdida|peor curva|mas tiempo|me cuesta|mi peor|freno peor|frenando peor|peor frenada)/.test(t))return worstCorner(subject,lap);
+  if(/(donde pierdo|mayor perdida|peor curva|mas tiempo|me cuesta|mi peor|freno peor|frenando peor|peor frenada|punto[^a-z]{0,15}pierd\w*|pierd\w* mas\b)/.test(t))return worstCorner(subject,lap);
   if(n!==null)return cornerReport(n,subject,lap);
+  if(/donde freno|donde frenar|donde hay que frenar|donde se frena|puntos? de frenada/.test(t)){
+    var ks=/detras/.test(t)?'rivalB':/delante|rival/.test(t)?'rival':(mem.subject||'ref');
+    return brakeReport(ks,pickLap(t)||mem.lap||1);}
   if(/^(y )?(ahi|en esa|en esa curva|y el de delante|y el de detras|y el rival|y la referencia)/.test(t)&&mem.corner)return cornerReport(mem.corner,subject,lap);
   if(/frena(n)? (antes|despues|mas tarde|mas pronto)/.test(t)){
     if(mem.corner)return cornerReport(mem.corner,subject,lap);
