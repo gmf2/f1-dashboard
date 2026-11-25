@@ -153,10 +153,106 @@ function circuitFact(t){
   if(/quien va (primero|ganando|delante en el)|mundial|clasificacion general|campeonato/.test(t))return 'No tengo datos del mundial ni de la clasificacion: solo analizo las trazas demo de Monza. No invento clasificaciones.';
   if(/proxima carrera|cuando (es|se corre|corren)|que gp|gran premio/.test(t))return 'No tengo el calendario en esta demo; solo mido vueltas de Monza. Eso te lo puedo mirar fuera si me lo pides por el chat normal.';
   return null;}
+function fmtLapT(t){var m=Math.floor(t/60),s=(t-m*60).toFixed(3);return m+':'+(t-m*60<10?'0':'')+s;}
+function lapReport(n){
+  var L=laps(),cur=L['player'+n];
+  if(!cur)return null;
+  var ds=DS,t=cur[cur.length-1][1];
+  var parts=['Vuelta '+n+' completada: '+fmtLapT(t)+'.'];
+  var prev=L['player'+(n-1)];
+  if(prev){
+    var d=t-prev[prev.length-1][1];
+    if(Math.abs(d)<0.05)parts.push('Tiempo identico a la vuelta '+(n-1)+' (+-0.05 s).');
+    else parts.push(d>0?('Pierdes '+d.toFixed(3)+' s respecto a la vuelta '+(n-1)+'.'):('Ganas '+Math.abs(d).toFixed(3)+' s respecto a la vuelta '+(n-1)+'.'));
+    var worst=null;
+    window.TRACK_MONZA.corners.forEach(function(c){
+      var dd=AN.cornerDelta(prev,cur,c,ds)*1000; // >0: la vuelta anterior era mas rapida en la curva (hoy pierdes)
+      if(worst===null||dd>worst.d)worst={c:c,d:dd};});
+    if(worst&&worst.d>20)parts.push('Donde mas dejas vs tu vuelta anterior: curva '+worst.c.n+' ('+worst.c.name+'), unos '+Math.round(worst.d)+' ms.');
+    else parts.push('Ninguna curva empeora mas de 20 ms vs tu vuelta anterior.');}
+  parts.push('De ritmo, '+paceLine('rival',n)+'; y '+paceLine('rivalB',n)+'.');
+  parts.push('Esto es lo que miden los datos; la causa de cada diferencia no se puede demostrar con esto.');
+  mem.lap=n;mem.lastIntent='lap';mem.lastDeps=['jefe','telemetria','rivales'];
+  return parts.join(' ');}
+function statusReport(){
+  var t1=lapTimeOf('you',1),t2=lapTimeOf('you',2);
+  var parts=['Estado de la sesion (demo): vuelta 1 '+fmtLapT(t1)+', vuelta 2 '+fmtLapT(t2)+' ('+(t2<t1?'mejoras':'pierdes')+' '+Math.abs(t2-t1).toFixed(3)+' s).'];
+  parts.push('De ritmo, '+paceLine('rival',2)+'; y '+paceLine('rivalB',2)+'.');
+  var w=worstCornerData('ref',2);
+  if(w&&w.d>20)parts.push('Tu mayor perdida contra la referencia esta en la curva '+w.c.n+' ('+w.c.name+'): unos '+Math.round(w.d)+' ms.');
+  parts.push('Neumaticos, meteo y energia no tienen datos en esta demo.');
+  mem.lastIntent='status';mem.lastDeps=['jefe','telemetria','rivales'];
+  return parts.join(' ');}
+function worstCornerData(subject,lap){
+  var you=traceOf('you',lap),other=traceOf(subject,lap),worst=null;
+  window.TRACK_MONZA.corners.forEach(function(c){
+    var dd=AN.cornerDelta(other,you,c,DS)*1000; // >0: tu pierdes
+    if(worst===null||dd>worst.d)worst={c:c,d:dd};});
+  return worst;}
+function bestCornerData(subject,lap){
+  var you=traceOf('you',lap),other=traceOf(subject,lap),best=null;
+  window.TRACK_MONZA.corners.forEach(function(c){
+    var dd=AN.cornerDelta(other,you,c,DS)*1000; // <0: tu ganas
+    if(best===null||dd<best.d)best={c:c,d:dd};});
+  return best;}
+function sectorTime(tr,a,b){return AN.binAt(tr,b,DS)[1]-AN.binAt(tr,a,DS)[1];}
+function recentLapsReport(n){
+  var L=laps(),lapsAvail=[1,2].filter(function(i){return L['player'+i];});
+  var parts=[];
+  if(lapsAvail.length<n)parts.push('Pides medias de '+n+' vueltas pero la muestra disponible es de '+lapsAvail.length+' vueltas de demostracion; no relleno lo que no hay.');
+  var secs=window.TRACK_MONZA.sectors;
+  lapsAvail.forEach(function(i){
+    var tr=L['player'+i];
+    var s1=sectorTime(tr,0,secs[0].end),s2=sectorTime(tr,secs[0].end,secs[1].end),s3=sectorTime(tr,secs[1].end,secs[2].end);
+    parts.push('Vuelta '+i+': '+fmtLapT(tr[tr.length-1][1])+' (S1 '+s1.toFixed(3)+', S2 '+s2.toFixed(3)+', S3 '+s3.toFixed(3)+').');});
+  if(lapsAvail.length===2){
+    var d=lapTimeOf('you',2)-lapTimeOf('you',1);
+    parts.push('Diferencia entre las 2 vueltas disponibles: '+(d>0?'+':'')+d.toFixed(3)+' s. Una media por vuelta y por sectores con mas historial llegaria con los datos reales.');}
+  mem.lastIntent='recent';mem.lastDeps=['jefe','telemetria'];
+  return parts.join(' ');}
+function bestCornerReport(subject,lap){
+  var bt=bestCornerData(subject,lap);
+  mem.lastIntent='best';mem.subject=subject;mem.lap=lap;
+  if(bt&&bt.d<-20){mem.corner=bt.c.n;return 'Tu mejor curva contra '+subjName(subject)+' en la vuelta '+lap+' es la '+bt.c.n+' ('+bt.c.name+'): ganas unos '+Math.round(-bt.d)+' ms. Es lo que miden los datos; la causa no se puede demostrar con esto.';}
+  return 'Contra '+subjName(subject)+' no ganas mas de 20 ms en ninguna curva de la vuelta '+lap+'; asi de claro esta con estos datos.';}
 function route(raw){
   var t=norm(raw);
   if(!t)return null;
+  if(/^(repite|repitemelo|repetir|otra vez|vuelve a decirmelo|vuelve a decir|que has dicho|no te he oido|no te oi|como dices)/.test(t)){
+    if(mem.lastAnswer){mem.__skipStore=true;return mem.lastAnswer;}
+    return 'Aun no te he dicho nada en esta conversacion.';}
   mem.lastDeps=['jefe'];
+  if(/^(como voy|como estoy)( (en|de) general)?[?]?$/.test(t)||/estado general|dame un resumen|como va (la sesion|esto)/.test(t))return statusReport();
+  if(/lluvia|llover|lloviendo|va a llover|agua|mojado/.test(t)){
+    mem.lastIntent='rain';mem.lastDeps=['jefe','meteo'];
+    return 'En esta demo no tengo datos de meteo: las trazas solo traen velocidad, freno y acelerador. El protocolo del juego si incluye prevision (muestras con % de lluvia por minuto), asi que con la APK seria calculable; la APK esta en desarrollo.';}
+  if(/companero|mi compan/.test(t)){
+    mem.lastIntent='teammate';mem.lastDeps=['jefe'];
+    return 'Ojo: en esta demo solo tengo la referencia y dos rivales (el de delante y el de detras); no hay datos de tu companero de equipo, y no quiero confundirlo con el coche de detras. Te refieres al coche que llevas detras?';}
+  if(/(ultimas|ultimos) (\d+ )?vueltas|media (de|por) vuelta|medias por vuelta/.test(t)){
+    var mN=t.match(/(\d+) vueltas/);return recentLapsReport(mN?parseInt(mN[1]):5);}
+  if(/paro|parar|boxes|entro a|entramos|cambio de gomas|aguant(o|ar|amos) mas/.test(t)&&/neumatico|goma|blando|medio|duro|paro|parar|boxes|entro|cambio|aguant|sigo|seguir/.test(t)){
+    mem.lastIntent='strategy';mem.lastDeps=['jefe','estrategia'];
+    return 'Decidir parar o seguir necesita desgaste de gomas, huecos reales y trafico, y en esta demo no tengo ninguno: solo trazas de velocidad, freno y acelerador. El protocolo del juego expone desgaste y edad de neumaticos y los huecos reales, asi que con la APK podria estimarse con supuestos declarados; ahora mismo cualquier consejo de parada seria inventado.';}
+  if(/caida de ritmo|pierdo ritmo|perdiendo ritmo|degradacion|gomas gastadas|se me van/.test(t)){
+    mem.lastIntent='pacedrop';mem.lastDeps=['jefe','telemetria'];
+    var dd=lapTimeOf('you',2)-lapTimeOf('you',1);
+    return 'Lo medido en la demo: vuelta 1 '+fmtLapT(lapTimeOf('you',1))+' y vuelta 2 '+fmtLapT(lapTimeOf('you',2))+' ('+(dd>0?'pierdes':'mejoras')+' '+Math.abs(dd).toFixed(3)+' s). Atribuirlo a los neumaticos no se puede demostrar con estos datos: no hay desgaste, combustible ni trafico en las trazas.';}
+  if(/neumatico|goma|compuesto|blandos|medios|duros|edad de (las|los)/.test(t)){
+    mem.lastIntent='tires';mem.lastDeps=['jefe','neumaticos'];
+    return 'Los neumaticos no tienen datos en esta demo (compuesto, edad y desgaste no estan en las trazas). El protocolo del juego si los expone para todos los coches, salvo que un rival online marque su telemetria como restringida; con la APK seria calculable.';}
+  if(/subviraje|sobreviraje|no me gira|patina|derrapa|balance|traccion|la salida de la recta|ayuda(me)? (con )?(la )?frenada|ayuda frenando/.test(t)){
+    mem.lastIntent='balance';mem.lastDeps=['jefe','telemetria'];
+    return 'Sobreviraje o subviraje no lo puedo diagnosticar con estas trazas: miden velocidad, freno y acelerador, no el equilibrio del coche. Lo que si puedo mirar curva a curva es donde frenas, cuanto tardas en ir a fondo y la velocidad de vertice y de salida; la causa (reglaje, neumaticos, pilotaje) no se puede demostrar con esto. Dime la curva y lo miramos.';}
+  if(/boost|\bers\b|energia|bateria|despliegue/.test(t)){
+    mem.lastIntent='ers';mem.lastDeps=['jefe'];
+    return 'La energia (ERS/boost) no esta en las trazas de esta demo. El protocolo del juego expone la energia almacenada y el modo de despliegue de tu coche (el de los rivales online puede venir restringido por su configuracion), asi que con la APK seria calculable para atacar o defender; ahora no puedo decirte cuanta tienes.';}
+  if(/donde (me )?(gana|recorta) el de detras|donde gana tiempo el de detras/.test(t)){
+    mem.subject='rivalB';return worstCorner('rivalB',pickLap(t)||mem.lap||1);}
+  if(/mejor curva|donde gano mas|donde soy mas rapido/.test(t)){
+    return bestCornerReport(mem.subject||'ref',pickLap(t)||mem.lap||1);}
+  if(/mi peor curva|peor curva/.test(t)){
+    var sub2=mem.subject||'ref';return worstCorner(sub2,pickLap(t)||mem.lap||1);}
   if(/^(hola|buenas|ey|buenos dias|buenas tardes)/.test(t)||(/^que tal/.test(t)&&!/curva|vuelta|pierd|frena|tramo|diferencia|mapa/.test(t)))return 'Hola. Puedo analizar tus vueltas de Monza (demo): frenadas, velocidades y donde ganas o pierdes contra la referencia o el de delante. Preguntame, por ejemplo: "donde pierdo mas?" o "frena antes el de delante en la 3?".';
   if(/gracias/.test(t))return 'De nada. Seguimos cuando quieras.';
   if(/^(estas ahi|me oyes|sigues ahi|estas)[?]?$/.test(t))return 'Si, aqui estoy, en el muro. Que miramos: curvas, sectores o rivales?';
@@ -208,6 +304,7 @@ function route(raw){
       if(mem.lastIntent==='gap')return gapReport(ns,lap);
       if(mem.lastIntent==='advice')return adviceReport(ns,lap);
       if(mem.lastIntent==='worst')return worstCorner(ns,lap);
+      if(mem.lastIntent==='best')return bestCornerReport(ns,lap);
       if(mem.lastIntent==='defense')return defenseReport(lap);
       if(mem.lastIntent==='sector'&&mem.sector)return sectorReport(mem.sector,ns,lap);
       if(mem.corner)return cornerReport(mem.corner,ns,lap);
@@ -234,7 +331,7 @@ function saveMem(){try{localStorage.setItem(MEM_KEY,JSON.stringify(mem));}catch(
 function adoptMem(v){try{var m=JSON.parse(v);if(m&&typeof m==='object'){for(var k in m)mem[k]=m[k];}}catch(e){}}
 var HAS_LS=(typeof localStorage!=='undefined'),HAS_LS_EV=(typeof addEventListener!=='undefined');
 if(HAS_LS){try{var prev=localStorage.getItem(MEM_KEY);if(prev)adoptMem(prev);}catch(e){}}
-function clearMemFields(){mem.corner=null;mem.subject=null;mem.lap=null;mem.sector=null;mem.lastIntent=null;}
+function clearMemFields(){mem.corner=null;mem.subject=null;mem.lap=null;mem.sector=null;mem.lastIntent=null;mem.lastAnswer=null;}
 function resetMem(){clearMemFields();try{if(HAS_LS)localStorage.removeItem(MEM_KEY);}catch(e){}}
 function memText(){var parts=[];
   if(mem.corner)parts.push('curva '+mem.corner);
@@ -243,5 +340,5 @@ function memText(){var parts=[];
   if(mem.lap&&mem.lap>1)parts.push('vuelta '+mem.lap);
   return parts.join(' · ');}
 if(HAS_LS_EV)addEventListener('storage',function(e){if(e.key!==MEM_KEY)return;if(e.newValue)adoptMem(e.newValue);else clearMemFields();});
-window.CHAT={route:function(t){var r=route(t);saveMem();return r;},mem:mem,memText:memText,resetMem:resetMem};
+window.CHAT={route:function(t){var r=route(t);if(mem.__skipStore){mem.__skipStore=false;}else if(r&&typeof r==='object'&&r.text)mem.lastAnswer=r.text;else if(typeof r==='string'&&r)mem.lastAnswer=r;saveMem();return r;},mem:mem,memText:memText,resetMem:resetMem,lapReport:lapReport};
 })();
