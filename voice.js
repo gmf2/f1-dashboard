@@ -43,15 +43,32 @@ function norm(s){
   return String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'')
     .replace(/[^a-z0-9ñ ]+/g,' ').replace(/\s+/g,' ').trim();}
 
+// Orden de repeticion inequivoca (complementa a isStopCmd): nunca se filtra como eco.
+function isRepeatCmd(txt){
+  var t=norm(txt);
+  return /^(repite|repitelo|repite eso|repetir|otra vez)( por favor)?$/.test(t);}
+
 // Guarda antieco: decide si una transcripcion es probablemente MI propia voz
 // (el altavoz reentrando por el micro) y no el usuario interrumpiendo.
+// Sesgo hacia el usuario: ante la duda se acepta la frase (un falso corte se
+// recupera; descartar una orden real deja al usuario sin respuesta).
 function looksEcho(txt){
   var s=norm(spokenNow),t=norm(txt);
   if(!s||!t)return false;
-  if(t.length>=8&&s.indexOf(t)>=0)return true; // frase entera contenida en lo hablado
-  var ws=t.split(' '),hit=0,tot=0;
-  for(var i=0;i<ws.length;i++){if(ws[i].length<3)continue;tot++;if(s.indexOf(ws[i])>=0)hit++;}
-  return tot>0&&hit/tot>=0.7;
+  if(isStopCmd(txt)||isRepeatCmd(txt))return false; // ordenes legitimas: nunca eco
+  var sw=s.split(' '),tw=t.split(' ').filter(function(w){return w.length>=3;});
+  // subcadena exacta larga de lo que estoy diciendo (>=3 palabras): casi seguro eco
+  if(t.length>=10&&tw.length>=3&&s.indexOf(t)>=0)return true;
+  // solape ordenado: >=80% de las palabras de contenido y en el mismo orden.
+  // Exige >=4 palabras: consultas cortas del usuario ("curva tres") siempre pasan.
+  if(tw.length<4)return false;
+  var hit=0,pos=0;
+  for(var i=0;i<tw.length;i++){
+    var found=-1;
+    for(var j=pos;j<sw.length;j++){
+      if(sw[j].indexOf(tw[i])===0||tw[i].indexOf(sw[j])===0){found=j;break;}}
+    if(found<0)continue;hit++;pos=found+1;}
+  return hit/tw.length>=0.8;
 }
 
 var speakToken=0; // invalida la cola anterior al cancelar
@@ -166,7 +183,7 @@ function isStopCmd(txt){
 
 window.VOICE={speak:speak,toggle:toggle,listen:listen,listenSession:listenSession,
   filterPhrase:filterPhrase,isStopCmd:isStopCmd,chunk:chunk,onState:onState,
-  interrupt:interrupt,looksEcho:looksEcho,
+  interrupt:interrupt,looksEcho:looksEcho,isRepeatCmd:isRepeatCmd,
   isSpeaking:function(){return out.speaking;},
   currentSpeech:function(){return spokenNow;},
   isOn:function(){return out.enabled;},
