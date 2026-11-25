@@ -228,6 +228,55 @@ function bestCornerReport(subject,lap){
   mem.lastIntent='best';mem.subject=subject;mem.lap=lap;
   if(bt&&bt.d<-20){mem.corner=bt.c.n;return 'Tu mejor curva contra '+subjName(subject)+' en la vuelta '+lap+' es la '+bt.c.n+' ('+bt.c.name+'): ganas unos '+Math.round(-bt.d)+' ms. Es lo que miden los datos; la causa no se puede demostrar con esto.';}
   return 'Contra '+subjName(subject)+' no ganas mas de 20 ms en ninguna curva de la vuelta '+lap+'; asi de claro esta con estos datos.';}
+/* --- v1.3: telemetria viva (solo marco superior; en box.html no hay rx.js) --- */
+function inApk(){return typeof window.Android!=='undefined';}
+function demoOK(){return !inApk()||(window.F1MODE&&window.F1MODE()==='demo');}
+function liveNow(){
+  try{
+    if(!window.RXAPP)return null;
+    var st=window.RXAPP.route('/state');
+    if(st&&st.packets>0&&st.age!==null&&st.age<3)return st;
+  }catch(e){}
+  return null;}
+function fmtGapMs(msv){if(msv===null||msv===undefined)return null;var sgn=msv>=0?'+':'-';return sgn+(Math.abs(msv)/1000).toFixed(3).replace('.',',')+' s';}
+function setupBits(LV){var su=LV&&LV.setup;return su?{bias:su.brake_bias,diff_on:su.diff_on,diff_off:su.diff_off,press:su.brake_pressure,eb:su.engine_braking,fw:su.front_wing,rw:su.rear_wing,nextfw:su.next_front_wing}:null;}
+function srcNote(){return ' (fuente: guia F1 25 de simracingsetup.com, 27-05-2025; referencia disponible, no certeza fisica)';}
+function sympIntro(LV){
+  var b=setupBits(LV);
+  if(b)return 'Llevas reparto '+b.bias+'%, presion '+b.press+'%, diferencial con gas '+b.diff_on+'% y sin gas '+b.diff_off+'%, freno motor '+b.eb+'%. ';
+  return 'No veo tus ajustes (sin telemetria viva o sin paquete CarSetup): va como direccion general; dime los valores y lo afino. ';}
+/* Diagnostico por sensaciones (encargo Gabriel 25 nov, reglas DISENO-ajustes.md v2):
+   - fase de curva primero; sin pasos universales; una prueba pequena y reversible
+     con condicion para deshacer; riesgos contrapuestos; en marcha solo MFD
+     (reparto, diferencial con gas, ERS: verificado en fuentes); setup va a boxes. */
+function detectSymptom(t){
+  if(/bloque/.test(t)){
+    if(/detras|atras|trasera/.test(t))return 'lock_r';
+    return 'lock_f';}
+  if(/(no me gira|subviraje|se (me )?va de morro|no gira|no rota|morro no)/.test(t)&&!/detras|atras|trasera|culo/.test(t))return 'under';
+  if(/subviraje/.test(t))return 'under';
+  if(/patina|sobreviraje|se me va (el|la) (culo|trasera)|derrap/.test(t))return 'over';
+  return null;}
+function sympAdvice(kind,phase,LV){
+  var b=setupBits(LV),pre=sympIntro(LV);
+  if(kind==='lock_f'){
+    var from=b?b.bias:56;
+    return pre+'Prueba pequena y reversible: baja el reparto de frenada un punto hacia atras en el MFD (de '+from+' a '+(from-1)+') y rodalo dos vueltas; si sigue bloqueando delante, otro punto. Si el coche se te va de atras en las frenadas fuertes, vuelve a '+from+'. La causa mas habitual del bloqueo delantero es el reparto demasiado adelantado'+srcNote()+'. Riesgo contrario: demasiado atras y bloqueas las traseras.';}
+  if(kind==='lock_r'){
+    var from2=b?b.bias:56;
+    return pre+'Prueba pequena y reversible: sube el reparto un punto hacia delante en el MFD (de '+from2+' a '+(from2+1)+') y rodalo dos vueltas; si empiezas a bloquear delante, vuelve a '+from2+'. Si el bloqueo trasero llega al bajar de marcha, otra causa habitual es el freno motor alto, pero ese ajuste solo se cambia en boxes (setup), no en marcha.';}
+  if(kind==='under'){
+    if(phase==='entry')return pre+'En entrada: prueba un punto de reparto atras (de '+(b?b.bias:56)+' a '+((b?b.bias:56)-1)+') para que el morro rote mejor al entrar; si la trasera se pone nerviosa frenando, deshaz. Para mas carga delantera: pide +1 de ala delantera para la proxima parada'+(b?' (ahora programado '+b.nextfw+')':'')+'; el ala es ajuste de setup, no de MFD en marcha.';
+    if(phase==='mid')return pre+'En el centro de la curva el subviraje es sobre todo aerodinamico: el ajuste real es ala delantera en setup (boxes); en marcha solo puedes pedir +1 para la proxima parada. Si es en una curva concreta dime cual y lo miramos con datos.';
+    if(phase==='exit')return pre+'Si es al acelerar no es subviraje puro, es traccion: ahi si toca el diferencial con gas. Prueba a abrirlo un punto (de '+(b?b.diff_on:55)+' a '+((b?b.diff_on:55)-1)+'): la trasera patina menos a cambio de una salida algo menos agresiva'+srcNote()+'. Si notas que pierdes salida, vuelve al valor anterior.';
+    return pre+'Para no recomendar a ciegas: te pasa en una curva o en todas, y en que fase: entrada, centro o salida al acelerar?';}
+  if(kind==='over'){
+    if(phase==='exit')return pre+'A la salida si toca diferencial: prueba a abrirlo un punto con gas en el MFD (de '+(b?b.diff_on:55)+' a '+((b?b.diff_on:55)-1)+'): la trasera trabaja mas libre y patina menos, a cambio de una salida algo menos agresiva'+srcNote()+'. Si pierdes salida, vuelve al valor anterior. Si te pasa en una curva rapida concreta, la causa puede ser ala trasera (setup, solo boxes).';
+    if(phase==='entry')return pre+'Si patina entrando (al frenar) no es diferencial: es reparto de frenada o freno motor. Prueba un punto de reparto adelante (de '+(b?b.bias:56)+' a '+((b?b.bias:56)+1)+'); si empiezas a bloquear delante, deshaz. El freno motor solo se cambia en boxes.';
+    if(phase==='mid')return pre+'Si patina en el centro, sobre todo en curva rapida, es carga aerodinamica trasera: eso es ala trasera en setup (solo boxes), no hay palanca en marcha. Si es en curva lenta, puede ser tambien como aplicas el gas; dime la curva y lo vemos.';
+    return pre+'Antes de tocar nada: en que momento patina, al entrar (frenando), en el centro de la curva o al acelerar a la salida? Segun la fase cambia el ajuste.';}
+  return null;}
+
 function route(raw){
   var t=norm(raw);
   if(!t)return null;
@@ -235,6 +284,48 @@ function route(raw){
     if(mem.lastAnswer){mem.__skipStore=true;return mem.lastAnswer;}
     return 'Aun no te he dicho nada en esta conversacion.';}
   mem.lastDeps=['jefe'];
+  var LV=liveNow();
+  if(LV){
+    if(/^(como voy|como estoy)/.test(t)&&LV.live.lap){
+      var lp0=LV.live.lap,parts=['En directo de tu telemetria: vas P'+lp0.pos+' en la vuelta '+lp0.lap];
+      if(lp0.last_ms)parts.push('ultima vuelta '+fmtLapT(lp0.last_ms/1000));
+      var g0=fmtGapMs(lp0.front);if(g0)parts.push('hueco con el de delante '+g0);
+      if(LV.live.tel)parts.push('ahora '+LV.live.tel.speed+' km/h, marcha '+LV.live.tel.gear);
+      return parts.join(', ')+'.';}
+    if(/(a cuanto voy|a cuanto estoy|que velocidad|velocidad llevo|(en )?que marcha|revoluciones|\brpm\b)/.test(t)&&LV.live.tel){
+      var tl9=LV.live.tel;
+      mem.lastIntent='live';mem.lastDeps=['jefe','telemetria'];
+      return 'Ahora mismo: '+tl9.speed+' km/h, marcha '+tl9.gear+', '+tl9.rpm+' rpm, acelerador '+Math.round(tl9.throttle*100)+'% y freno '+Math.round(tl9.brake*100)+'%. Dato en directo de tu telemetria.';}
+    if(/(que posicion|que puesto|por donde voy|que vuelta voy|por que vuelta)/.test(t)&&LV.live.lap){
+      var lp1=LV.live.lap,ans='En directo: P'+lp1.pos+', vuelta '+lp1.lap+(LV.live.track&&LV.live.track.total_laps?' de '+LV.live.track.total_laps:'')+'.';
+      if(lp1.last_ms)ans+=' Ultima vuelta: '+fmtLapT(lp1.last_ms/1000)+'.';
+      return ans;}
+    if(/(que ajustes|que setup|como llevo el coche|reparto de frenada|balance de frenos|que diferencial|presion de freno)/.test(t)){
+      var sb9=setupBits(LV);
+      if(sb9)return 'Tus ajustes transmitidos ahora: ala delantera '+sb9.fw+', trasera '+sb9.rw+', reparto de frenada '+sb9.bias+'%, presion de freno '+sb9.press+'%, diferencial con gas '+sb9.diff_on+'% y sin gas '+sb9.diff_off+'%, freno motor '+sb9.eb+'%. Que el juego transmita el dato no significa que todo se pueda cambiar en marcha: en el MFD se mueven reparto, diferencial con gas y ERS; el resto es setup de boxes.';
+      return 'No me llega el paquete de ajustes (CarSetup) de tu coche: comprueba que la telemetria UDP del juego este activada y que la sesion este en marcha.';}
+    if(/\bers\b|energia|bateria/.test(t)&&LV.live.status){
+      var st9=LV.live.status;
+      return 'Tu energia ahora: modo ERS '+st9.ers_mode+', almacenada '+Math.round(st9.ers_j/1000)+' kJ, desplegada esta vuelta '+Math.round(st9.ers_dep/1000)+' kJ. Combustible: '+st9.fuel_laps.toFixed(1)+' vueltas. En directo de tu telemetria.';}
+    if(/\b(gap|ventaja|hueco|intervalo)\b|cuanto me saca|cuanto le saco|a cuanto (voy|estoy) (del|de)/.test(t)&&LV.live.lap){
+      var lp2=LV.live.lap,gf=fmtGapMs(lp2.front),gl=fmtGapMs(lp2.leader),pp=[];
+      if(gf)pp.push('con el de delante '+gf);
+      if(gl)pp.push('con el lider '+gl);
+      return pp.length?('En directo: '+pp.join(', ')+' (P'+lp2.pos+'). Estos huecos si son los reales del juego, no como en la demo.'):'En directo pero sin hueco computable ahora (quizas vas primero o el juego aun no lo da).';}
+  }
+  if(mem.symp&&/entrad|apoy|medi|centr|salid|aceler|frenad/.test(t)){
+    var ph9=/entrad|frenad/.test(t)?'entry':/salid|aceler/.test(t)?'exit':/apoy|medi|centr/.test(t)?'mid':null;
+    if(ph9){var sk9=mem.symp;mem.symp=null;return sympAdvice(sk9,ph9,LV);}}
+  var symp9=detectSymptom(t);
+  if(symp9){
+    mem.lastIntent='symptom';mem.lastDeps=['jefe','telemetria'];
+    if(symp9==='under'||symp9==='over'){mem.symp=symp9;return sympAdvice(symp9,null,LV);}
+    return sympAdvice(symp9,null,LV);}
+  /* APK sin datos vivos y sin demo explicita: ninguna respuesta con trazas sinteticas.
+     Sintomas (arriba), saludos/ayuda y datos de circuito siguen disponibles. */
+  if(!LV&&!demoOK()&&!/^(hola|buenas|ey|buenos dias|buenas tardes)|que tal|gracias|estas ahi|me oyes|adios|hasta luego|nos vemos|que puedes hacer|^ayuda|como funcionas|para que sirves/.test(t)){
+    mem.lastIntent='nodata';mem.lastDeps=['jefe'];
+    return 'No hay datos en directo ahora: la app esta esperando la telemetria del juego (UDP 20777). Cuando llegue contesto con tus datos reales. Si quieres practicar con la demostracion, toca "Ver demostracion" arriba. Mientras puedo hablarte de ajustes por lo que notas (bloqueos, que no gira delante, que patina de atras) o del circuito.';}
   if(/^(como voy|como estoy)( (en|de) general)?[?]?$/.test(t)||/estado general|dame un resumen|como va (la sesion|esto)/.test(t))return statusReport();
   if(/lluvia|llover|lloviendo|va a llover|agua|mojado/.test(t)){
     mem.lastIntent='rain';mem.lastDeps=['jefe','meteo'];
@@ -254,9 +345,7 @@ function route(raw){
   if(/neumatico|goma|compuesto|blandos|medios|duros|edad de (las|los)/.test(t)){
     mem.lastIntent='tires';mem.lastDeps=['jefe','neumaticos'];
     return 'Los neumaticos no tienen datos en esta demo (compuesto, edad y desgaste no estan en las trazas). El protocolo del juego si los expone para todos los coches, salvo que un rival online marque su telemetria como restringida; con la APK seria calculable.';}
-  if(/subviraje|sobreviraje|no me gira|patina|derrapa|balance|traccion|la salida de la recta|ayuda(me)? (con )?(la )?frenada|ayuda frenando/.test(t)){
-    mem.lastIntent='balance';mem.lastDeps=['jefe','telemetria'];
-    return 'Sobreviraje o subviraje no lo puedo diagnosticar con estas trazas: miden velocidad, freno y acelerador, no el equilibrio del coche. Lo que si puedo mirar curva a curva es donde frenas, cuanto tardas en ir a fondo y la velocidad de vertice y de salida; la causa (reglaje, neumaticos, pilotaje) no se puede demostrar con esto. Dime la curva y lo miramos.';}
+
   if(/boost|\bers\b|energia|bateria|despliegue/.test(t)){
     mem.lastIntent='ers';mem.lastDeps=['jefe'];
     return 'La energia (ERS/boost) no esta en las trazas de esta demo. El protocolo del juego expone la energia almacenada y el modo de despliegue de tu coche (el de los rivales online puede venir restringido por su configuracion), asi que con la APK seria calculable para atacar o defender; ahora no puedo decirte cuanta tienes.';}
@@ -280,6 +369,7 @@ function route(raw){
   if(soc)return soc;
   var fact=circuitFact(t);
   if(fact){if(/que tiempo|llueve|lluvia|clima|meteo|mojado|seco/.test(t))mem.lastDeps=['jefe','meteo'];return fact;}
+
   var lap=pickLap(t)||mem.lap;
   var n=pickCorner(t);
   if(n===null){var nm=[['parabolica',11],['alboreto',11],['ascari',8],['lesmo',6],['roggia',4],['retifilo',1],['rettifilo',1],['biassono',2],['curva grande',3]];for(var k=0;k<nm.length;k++){if(t.indexOf(nm[k][0])>=0){n=nm[k][1];break;}}}
