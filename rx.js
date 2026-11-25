@@ -35,10 +35,11 @@ function mk(fmt) {            // '<HBBf4H32s' -> {size, un(view, off)}
 var HDR = mk('<HBBBBBQfIIBB'), LAP = mk('<IIHBHBHBHBfffBBBBBBBBBBBBBBBHHBfB'), TEL = mk('<HfffBbHBBH4H4B4BB4f4B'),
     ST = mk('<BBBBBfffHHBBHBBBbfffBffffB'), T2 = mk('<BBHBBHBB'), MOT = mk('<6f9h3f'), DMG = mk('<4f30B'),
     PART = mk('<BHHHBBB32sBBHBB12B'), TSET = mk('<BBBBBBBhB'), SES = mk('<BbbBHBb'),
+    SETUP = mk('<BBBB4f9B4fBf'),
     HIST_HEAD = mk('<BBBBBBB'), HLAP = mk('<IHBHBHBB');
 var H = HDR.size;
 var TSET_TOTAL = H + 1 + 20 * TSET.size + 1, HIST_TOTAL = H + HIST_HEAD.size + 100 * HLAP.size + 8 * 3, EV_TOTAL = 45;
-var EXPECT = {1: [SES, 926, 0], 0: [MOT, 1325, 0], 2: [LAP, 1399, 2], 6: [TEL, 1448, 3], 7: [ST, 1445, 0], 16: [T2, 269, 0]};
+var EXPECT = {1: [SES, 926, 0], 0: [MOT, 1325, 0], 2: [LAP, 1399, 2], 5: [SETUP, 1233, 4], 6: [TEL, 1448, 3], 7: [ST, 1445, 0], 16: [T2, 269, 0]};
 var EXTRA = {10: [DMG, 1133, 0], 4: [PART, 1470, 1]};
 var SIZE_OK = {};
 Object.keys(EXPECT).concat(Object.keys(EXTRA)).forEach(function (k) {
@@ -67,7 +68,7 @@ var S;
 function newState() {
   return {live: {}, lapdata: null, packets: 0, last_rx: 0, fmt: null, session: null, simulated: false, cur: null, laps: [], status: null,
     motion: null, cars: [], allcars: {}, carcomp: {}, names: {}, hist: {}, events: [], rrec: {}, rlaps: {}, damage: null, tyresets: null,
-    player: null, track: null, sess_key: null, total_laps: 0, max_dist: -1.0, max_ms: -1,
+    player: null, track: null, sess_key: null, total_laps: 0, max_dist: -1.0, max_ms: -1, setup: null,
     sx: {}, final: null, rlog: [], rl_lap: null, rl_f: null, last_save: 0, saved_final: false, tcache: {}};
 }
 S = newState();
@@ -204,6 +205,14 @@ function handle(data) {            // data: Uint8Array
     closeLap(S.lapdata.lap, S.lapdata.last_ms);
     S.live.lap = S.lapdata;
     raceLogTick();
+  } else if (pid === 5) {
+    S.setup = {front_wing: p[0], rear_wing: p[1], diff_on: p[2], diff_off: p[3],
+      camber_f: p[4], camber_r: p[5], toe_f: p[6], toe_r: p[7],
+      susp_f: p[8], susp_r: p[9], arb_f: p[10], arb_r: p[11], ride_f: p[12], ride_r: p[13],
+      brake_pressure: p[14], brake_bias: p[15], engine_braking: p[16],
+      psi_fl: p[19], psi_fr: p[20], psi_rl: p[17], psi_rr: p[18], ballast: p[21], fuel_load: p[22],
+      next_front_wing: v.getFloat32(H + N * SETUP.size, true)};
+    S.live.setup = S.setup;
   } else if (pid === 6) {
     var tel = {speed: p[0], throttle: p[1], steer: p[2], brake: p[3], gear: p[5], rpm: p[6], drs: p[7], rev_pct: p[8], rev_bits: p[9],
       tyre_surf: p.slice(14, 18), tyre_inner: p.slice(18, 22), engine_temp: p[22], tyre_psi: p.slice(23, 27), brake_temp: p.slice(10, 14)};
@@ -441,7 +450,7 @@ function stateOut() {
     o.restricted = (S.names[i] || {}).restricted; if (o.restricted === undefined) o.restricted = null;
     return o;
   });
-  return {live: S.live, packets: S.packets, age: S.last_rx ? now() - S.last_rx : null, fmt: S.fmt, simulated: S.simulated, size_ok: SIZE_OK,
+  return {live: S.live, packets: S.packets, age: S.last_rx ? now() - S.last_rx : null, fmt: S.fmt, simulated: S.simulated, size_ok: SIZE_OK, setup: S.setup,
     laps: lapList(), result: classif(), fastest: fastLaps(), race: has(RACE_TYPES, (S.track || [0, 0, -1])[2]) ? raceEvolution() : null, session_extra: S.sx, hist: histOut(), events: S.events.slice(), rec: rivalSummary(), cars: cars};
 }
 function rcompare(q) {
