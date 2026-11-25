@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Muro de boxes F1 - demo Monza</title>
 <style>
+html,body{max-width:100vw;overflow-x:hidden}
 body{margin:0;font-family:system-ui,-apple-system,sans-serif;background:#101012;color:#f5f5f5;display:flex;flex-direction:column;height:100vh}
 header{padding:10px 14px;background:#1c1c1e;border-bottom:1px solid #333;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 header h1{font-size:15px;margin:0;flex:1}
@@ -20,11 +21,11 @@ body[data-tab=box] #voice-out,body[data-tab=box] #voice-in,body[data-tab=box] #l
 .tabpage[hidden]{display:none}
 #boxframe,#cockpitframe{flex:1;border:0;width:100%;background:#05070c}
 main{flex:1;display:flex;min-height:0}
-#chat{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px}
+#chat{flex:1;min-width:0;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px}
 .msg{max-width:85%;padding:8px 11px;border-radius:12px;font-size:14px;line-height:1.45;white-space:pre-wrap}
 .msg.you{align-self:flex-end;background:#0a84ff;color:#fff}
 .msg.bot{align-self:flex-start;background:#2c2c2e}
-#side{width:300px;border-left:1px solid #333;padding:8px;display:flex;flex-direction:column}
+#side{width:300px;flex:none;border-left:1px solid #333;padding:8px;display:flex;flex-direction:column;min-height:0;overflow-y:auto}
 #side h2{font-size:12px;color:#999;margin:4px 0}
 #legend{font-size:11px;color:#999}
 #legend span{display:inline-block;width:10px;height:10px;border-radius:2px;margin:0 4px 0 8px;vertical-align:middle}
@@ -32,7 +33,7 @@ footer{display:flex;gap:8px;padding:10px;border-top:1px solid #333}
 footer input{flex:1;background:#1c1c1e;border:1px solid #444;border-radius:8px;color:#f5f5f5;padding:10px;font-size:14px}
 footer button{background:#0a84ff;color:#fff;border:none;border-radius:8px;padding:10px 16px;font-size:14px}
 @media(max-width:720px){main{flex-direction:column-reverse}#side{width:auto;border-left:none;border-top:1px solid #333}#map svg{max-height:220px}}
-#cards{display:grid;grid-template-columns:1.25fr 1fr;gap:10px;padding:10px 12px 0}
+#cards{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:10px;padding:10px 12px 0}
 #cards .card{background:#10151c;border:1px solid #1e2631;border-radius:14px;padding:10px 14px;display:flex;flex-direction:column;justify-content:center}
 #cards .lab{font-size:11px;font-weight:700;letter-spacing:1.2px;color:#8fa1b5;text-transform:uppercase}
 #cards .big{font-size:44px;font-weight:800;line-height:1.05;font-variant-numeric:tabular-nums}
@@ -51,7 +52,7 @@ footer button{background:#0a84ff;color:#fff;border:none;border-radius:8px;paddin
 #cards .sect .s .l{font-size:10px;color:#8fa1b5;margin-top:2px}
 #cards .nodata{grid-column:1/-1;border:1px dashed #334052;background:#0c1117;border-radius:10px;padding:6px 12px;font-size:11px;color:#7c8a9d}
 #cards .demotag{grid-column:1/-1;font-size:10px;color:#5f6f83;text-align:right;margin-top:-4px}
-#actions{display:flex;gap:10px;padding:10px 12px 0}
+#actions{display:flex;gap:10px;padding:10px 12px 0;flex-wrap:wrap}
 #actions .btn{flex:1;background:#17324f;border:1px solid #2c5a86;border-radius:12px;padding:10px;font-size:15px;font-weight:700;color:#dbe9f7;text-align:center;cursor:pointer}
 #actions .btn.radio{background:#123f2a;border-color:#1f6b45;color:#a7f3c7}
 @media(max-width:720px){#cards{grid-template-columns:1fr 1fr}#cards .big{font-size:32px}}
@@ -128,8 +129,8 @@ footer button{background:#0a84ff;color:#fff;border:none;border-radius:8px;paddin
 <script src="track-monza.js?v=7"></script>
 <script src="laps-demo.js?v=7"></script>
 <script src="analysis.js?v=7"></script>
-<script src="chat.js?v=15"></script>
-<script src="voice.js?v=7"></script>
+<script src="chat.js?v=16"></script>
+<script src="voice.js?v=8"></script>
 <script src="ui.js?v=9"></script>
 <script>window.UI.boot();</script>
 </body>
