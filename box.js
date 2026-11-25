@@ -250,17 +250,37 @@ q.addEventListener('keydown',e=>{if(e.key==='Enter')ask();});
     vbtn.textContent='Voz: '+(on?'ON':'OFF');
     if(on)window.VOICE.speak('Voz activada: sintesis del navegador.');
   };
-  let rec=null,micOK=false;
+  let session=null,micOK=false;
+  window.VOICE.onState(function(st,err){
+    if(st==='speak-error'){
+      vbtn.textContent='Voz: error';
+      add('bot','La voz ha fallado en este dispositivo (error del navegador: '+err+'). Revisa el volumen multimedia y la salida de voz del sistema; con ese error concreto puedo afinar la solucion.');}
+    // barge-in: ya NO se pausa la escucha al hablar; la sesion (bargeIn:true) corta
+    // la voz si el usuario habla (guarda antieco en voice.js).
+    if(st==='interrupted')mbtn.textContent='Radio: ON';});
+  function radioOff(silent){
+    if(session){session.close();session=null;}
+    mbtn.textContent='Micro';
+    if(!silent)add('bot','Sesion de radio cerrada. Toca Micro para abrirla de nuevo.');}
   function startListen(){
-    if(rec){try{rec.stop();}catch(e){}rec=null;mbtn.textContent='Micro';return;}
-    rec=window.VOICE.listen(function(txt){q.value=txt;ask();},function(st){
-      mbtn.textContent=st==='listening'?'Micro: escuchando':'Micro';
-      if(st!=='listening')rec=null;
-    });
-    if(rec)mbtn.textContent='Micro: escuchando';
+    if(session){radioOff();return;}
+    session=window.VOICE.listenSession({
+      bargeIn:true,
+      onFinal:function(txt){
+        txt=window.VOICE.filterPhrase(txt);
+        if(!txt)return;
+        if(window.VOICE.isStopCmd(txt)){radioOff();return;}
+        q.value=txt;ask();},
+      onState:function(st){
+        if(st==='listening')mbtn.textContent='Radio: ON';
+        else if(st==='idle')mbtn.textContent='Micro';
+        else if(st==='unsupported'){add('bot','Este navegador no tiene reconocimiento de voz.');radioOff(true);}
+        else if(st.indexOf('error:')===0){add('bot','El micro ha fallado ('+st.slice(6)+'). Sesion cerrada; revisa el permiso de micro del navegador.');radioOff(true);}}});
+    if(!session){add('bot','Este navegador no tiene reconocimiento de voz.');return;}
+    add('bot','Modo radio abierto: habla cuando quieras. Si hablas mientras te contesto, me callo y te escucho. Di "corta" o toca Micro para cerrar.');
   }
   mbtn.onclick=function(){
-    if(rec){startListen();return;}
+    if(session){startListen();return;}
     if(micOK){startListen();return;}
     bar.style.display='block';
   };
