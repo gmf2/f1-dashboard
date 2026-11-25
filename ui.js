@@ -45,10 +45,46 @@ function ask(text){
   else ans=r;
   addMsg('bot',ans);window.VOICE.speak(ans);
   drawMap(currentDeltaSeg());renderCtx();}
+
+function fmtS(t){var m=Math.floor(t/60),ss=(t-m*60).toFixed(3);return m+':'+(ss<10?'0':'')+ss;}
+function renderCards(){
+  var L=window.LAPS_DEMO,AN=window.AN,T=window.TRACK_MONZA;
+  if(!el('cards')||!L||!AN||!T)return;
+  var DS2=10;
+  function tend(tr){return tr[tr.length-1][1];}
+  var t1=tend(L.player1),t2=tend(L.player2);
+  var bestT=Math.min(t1,t2),bestN=t1<=t2?1:2;
+  // delta total vs el de delante en la vuelta 2 (>0 = pierdes)
+  var dFront=(t2-tend(L.rivalAhead))*1000;
+  var dBehind=(t2-tend(L.rivalBehind))*1000;
+  function signed(ms){return (ms>=0?'+':'-')+(Math.abs(ms)/1000).toFixed(3).replace('.',',')+' s';}
+  var hd=el('c-delta');
+  if(dFront<0){hd.textContent='GANAS '+(-dFront/1000).toFixed(3).replace('.',',')+' s';hd.className='big good';}
+  else{hd.textContent='PIERDES '+(dFront/1000).toFixed(3).replace('.',',')+' s';hd.className='big bad';}
+  el('c-delta-sub').textContent='vuelta 2 completa · signo: tu tiempo − el suyo, negativo = ganas';
+  el('c-lap').textContent=fmtS(t2);
+  el('c-lap-sub').textContent='mejor: '+fmtS(bestT)+' (v'+bestN+') · v1 '+fmtS(t1);
+  el('c-front').textContent=signed(dFront);
+  el('c-behind').textContent=signed(dBehind);
+  // peor/mejor curva vs el de delante (mismo calculo que el chat)
+  var worst=null,best=null;
+  T.corners.forEach(function(c){
+    var loss=-AN.cornerDelta(L.player2,L.rivalAhead,c,DS2)*1000; // >0 = pierdes tu (mismo calculo que chat.js)
+    if(!worst||loss>worst.v)worst={c:c,v:loss};
+    if(!best||loss<best.v)best={c:c,v:loss};});
+  if(worst&&worst.v>0){el('c-worst').textContent='PIERDES '+Math.round(worst.v)+' ms';
+    el('c-worst-sub').textContent='Curva '+worst.c.n+' · '+worst.c.name+(best&&best.v<0?' · donde mas ganas: curva '+best.c.n+' ('+best.c.name+') '+Math.round(-best.v)+' ms':'');}
+  else if(best){el('c-worst').textContent='NO PIERDES en ninguna';el('c-worst').className='mid good';
+    el('c-worst-sub').textContent='donde mas ganas: curva '+best.c.n+' ('+best.c.name+') '+Math.round(-best.v)+' ms';}
+  // tercios de la ultima vuelta por distancia
+  var M=L.player2[L.player2.length-1][0],thirds=[M/3,2*M/3,M],prev=0,out='';
+  thirds.forEach(function(mk,i){var tm=AN.binAt(L.player2,mk,DS2)[1];out+='<div class="s"><div class="v">'+(tm-prev).toFixed(3).replace('.',',')+'</div><div class="l">TERCIO '+(i+1)+'</div></div>';prev=tm;});
+  el('c-sect').innerHTML=out;}
 function renderCtx(){var t=window.CHAT.memText(),b=el('ctxbar');if(!b)return;
   if(t){el('ctxtext').textContent='Contexto: '+t;b.hidden=false;}else b.hidden=true;}
 function boot(){
   drawMap(null);
+  renderCards();
   addMsg('bot','Muro de boxes (demo Monza). Analisis y enrutado sin IA, todo calculo local: pregunta por curvas, frenadas, rivales o vueltas, o charlemos un rato. Los datos son de demostracion; las trazas reales llegarian por la APK, que esta en desarrollo.');
   renderCtx();
   addEventListener('storage',function(e){if(e.key==='f1-chat-mem-v1')renderCtx();});
@@ -56,12 +92,42 @@ function boot(){
   el('send').addEventListener('click',function(){var v=el('in').value;el('in').value='';if(v.trim())ask(v);});
   el('in').addEventListener('keydown',function(e){if(e.key==='Enter'){var v=el('in').value;el('in').value='';if(v.trim())ask(v);}});
   el('voice-out').addEventListener('click',function(){el('voice-out').textContent=window.VOICE.toggle()?'Voz: ON':'Voz: OFF';});
-  var micOK=false;
-  function startListen(){window.VOICE.listen(function(txt){ask(txt);},function(st){el('voice-in').textContent=st==='listening'?'Escuchando...':'Micro';});}
+  var session=null,micOK=false,lapN=1;
+  window.VOICE.onState(function(st,err){
+    if(st==='speak-error'){
+      el('voice-out').textContent='Voz: error';
+      addMsg('bot','La voz ha fallado en este dispositivo (error del navegador: '+err+'). Revisa el volumen multimedia y la salida de voz del sistema; con ese error concreto puedo afinar la solucion.');}
+    if(st==='speak-start'&&session)session.pause();
+    if(st==='speak-end'&&session)session.resume();});
+  function radioOff(silent){
+    if(session){session.close();session=null;}
+    el('voice-in').textContent='Micro';
+    if(!silent)addMsg('bot','Sesion de radio cerrada. Toca Micro para abrirla de nuevo.');}
+  function radioOn(){
+    session=window.VOICE.listenSession({
+      onFinal:function(txt){
+        txt=window.VOICE.filterPhrase(txt);
+        if(!txt)return;
+        if(window.VOICE.isStopCmd(txt)){radioOff();return;}
+        ask(txt);},
+      onState:function(st){
+        if(st==='listening')el('voice-in').textContent='Radio: ON';
+        else if(st==='idle')el('voice-in').textContent='Micro';
+        else if(st==='unsupported'){addMsg('bot','Este navegador no tiene reconocimiento de voz.');radioOff(true);}
+        else if(st.indexOf('error:')===0){addMsg('bot','El micro ha fallado ('+st.slice(6)+'). Sesion cerrada; revisa el permiso de micro del navegador.');radioOff(true);}}});
+    if(!session){addMsg('bot','Este navegador no tiene reconocimiento de voz.');return;}
+    addMsg('bot','Modo radio abierto: habla cuando quieras, no hace falta tocar nada. Mientras te respondo en voz la escucha se pausa sola. Di "corta" o toca Micro para cerrar.');}
   el('voice-in').addEventListener('click',function(){
-    if(micOK){startListen();return;}
+    if(session){radioOff();return;}
+    if(micOK){radioOn();return;}
     el('mic-consent').style.display='block';});
-  el('mic-yes').addEventListener('click',function(){micOK=true;el('mic-consent').style.display='none';startListen();});
-  el('mic-no').addEventListener('click',function(){el('mic-consent').style.display='none';});}
+  el('mic-yes').addEventListener('click',function(){micOK=true;el('mic-consent').style.display='none';radioOn();});
+  el('mic-no').addEventListener('click',function(){el('mic-consent').style.display='none';});
+  el('lapdemo').addEventListener('click',function(){
+    var r=window.CHAT.lapReport(lapN+1);
+    if(r===null){addMsg('bot','Solo hay 2 vueltas de demostracion cargadas; el aviso automatico por vuelta en directo llegaria con los datos reales.');return;}
+    lapN++;
+    addMsg('bot',r);window.VOICE.speak(r);
+    drawMap(currentDeltaSeg());renderCtx();renderCards();});}
 window.UI={boot:boot,ask:ask,drawMap:drawMap};
 })();
