@@ -157,7 +157,7 @@ footer button{background:#0a84ff;color:#fff;border:none;border-radius:8px;paddin
       if(!s)return;
       if(window.RXAPP)window.RXAPP.push(s);
       if(!dash)dash=document.getElementById('dashframe');
-      if(dash&&dash.contentWindow)dash.contentWindow.postMessage({t:'f1udp',data:s},'*');
+      if(dash&&dash.contentWindow)dash.contentWindow.postMessage({t:'f1udp',data:s},window.F1TGT||'*');
     }catch(x){}
   }
   setInterval(f1drain,50);
@@ -165,7 +165,7 @@ footer button{background:#0a84ff;color:#fff;border:none;border-radius:8px;paddin
   setInterval(function(){
     try{
       if(!dash)dash=document.getElementById('dashframe');
-      if(dash&&dash.contentWindow)dash.contentWindow.postMessage({t:'f1hb'},'*');
+      if(dash&&dash.contentWindow)dash.contentWindow.postMessage({t:'f1hb'},window.F1TGT||'*');
     }catch(x){}
   },1000);
   window.F1LIVE=function(){
@@ -178,6 +178,7 @@ footer button{background:#0a84ff;color:#fff;border:none;border-radius:8px;paddin
   /* Modo de datos: en la APK el arranque y la desconexion muestran SIN DATOS,
      nunca demo automatica; la demo solo entra por eleccion explicita.
      En la web publica (sin puente Android) la demo sigue siendo el contenido. */
+  window.F1TGT=(location.origin&&location.origin.indexOf('https://')===0)?location.origin:'*';
   var MODE=null;
   window.F1MODE=function(){
     if(MODE)return MODE;
