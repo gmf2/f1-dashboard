@@ -149,14 +149,33 @@ function renderRace(){
   var fc=[['Ahora','Despejado',24,31],['+10 min','Nubes',23,30],['+20 min','Nubes',22,29],['+30 min','Lluvia ligera (prob. 40%)',20,26]];
   $('d_weather').innerHTML='<div class="warn">Solo demo. El receptor todavía no lee la previsión ni la ventana de parada (están en el paquete Session, documentado pero no leído).</div><table><tr><th>Momento</th><th>Tiempo</th><th>Aire °C</th><th>Pista °C</th></tr>'+fc.map(function(r){return'<tr><td>'+r[0]+'</td><td>'+r[1]+'</td><td>'+r[2]+'</td><td>'+r[3]+'</td></tr>'}).join('')+'</table><div class="small">Estado de bandera: verde · Safety car: ninguno · Ventana de parada sugerida por el juego: vueltas 4-6 (rejoin estimado P7)</div>'}
 // ---- Coche ----
+function dcol(p){return p===null||p===undefined||isNaN(p)?'#4a4a55':p<20?'#19c250':p<50?'#ffd400':'#e10600'}
+function dpct(v){return v===null||v===undefined||isNaN(v)?'—':Math.round(v)+'%'}
+function dmgHtml(a,ers){var V={};a.forEach(function(x){V[x[2]]=(x[1]===null||x[1]===undefined)?null:+x[1]});var f=function(k){return dcol(V[k])};
+ var P=function(k,x,y,w,h,r,lbl,lx,ly,anc){var tc=V[k]===null||V[k]===undefined?'#fff':'#000';return'<rect x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'" rx="'+r+'" fill="'+f(k)+'"/><text x="'+(x+w/2)+'" y="'+(y+h/2+5)+'" text-anchor="middle" font-size="13" font-weight="700" fill="'+tc+'">'+dpct(V[k])+'</text><text x="'+lx+'" y="'+ly+'" text-anchor="'+anc+'" font-size="11" fill="#b8b8c6">'+lbl+'</text>'};
+ var svg='<svg viewBox="0 0 340 420" style="width:100%;max-width:340px;display:block;margin:0 auto">'+
+ '<rect x="86" y="150" width="22" height="46" rx="6" fill="#2a2a33"/><rect x="232" y="150" width="22" height="46" rx="6" fill="#2a2a33"/><rect x="86" y="290" width="22" height="52" rx="6" fill="#2a2a33"/><rect x="232" y="290" width="22" height="52" rx="6" fill="#2a2a33"/>'+
+ P('wfl',50,30,118,28,5,'Alerón delantero izq.',109,22,'middle')+P('wfr',172,30,118,28,5,'Alerón delantero der.',231,22,'middle')+
+ '<polygon points="158,58 182,58 190,160 150,160" fill="#3a3a44"/>'+
+ '<rect x="108" y="150" width="124" height="170" rx="14" fill="none" stroke="'+f('floor')+'" stroke-width="8"/>'+
+ P('side',114,172,40,84,8,'Pontón',134,168,'middle')+P('side',186,172,40,84,8,'Pontón',206,168,'middle')+
+ P('eng',154,208,32,50,6,'Motor',170,202,'middle')+
+ P('gear',152,262,36,30,6,'Caja',170,310,'middle')+
+ '<text x="170" y="144" text-anchor="middle" font-size="11" fill="#b8b8c6">Suelo (borde del fondo): '+dpct(V.floor)+'</text>'+
+ '<polygon points="124,326 216,326 232,352 108,352" fill="'+f('diff')+'"/><text x="170" y="344" text-anchor="middle" font-size="13" font-weight="700" fill="'+(V.diff===null||V.diff===undefined?'#fff':'#000')+'">'+dpct(V.diff)+'</text><text x="250" y="344" font-size="11" fill="#b8b8c6">Difusor</text>'+
+ P('wr',92,366,156,28,5,'Alerón trasero',170,410,'middle')+'</svg>';
+ var worst=a.filter(function(x){return x[1]>0}),known=a.filter(function(x){return x[1]!==null&&x[1]!==undefined});
+ return svg+'<div class="small" style="text-align:center;margin-top:6px">'+(known.length&&!worst.length?'Sin daños. ':'')+(known.length<a.length?'Gris «—» = dato no recibido. ':'')+'Verde &lt; 20 % · amarillo &lt; 50 % · rojo ≥ 50 %'+(ers!==null&&ers!==undefined?' · Fallo ERS: '+(ers?'sí':'no'):'')+'</div>'}
+function wearHtml(w){return'<div style="display:flex;flex-wrap:wrap;gap:12px;justify-content:center">'+w.map(function(x){var na=x[1]===null||x[1]===undefined,p=na?0:clamp(x[1],0,100),c=na?'#4a4a55':dcol(p);return'<div style="text-align:center;width:78px"><div style="width:70px;height:70px;border-radius:50%;margin:0 auto;background:conic-gradient('+c+' '+p+'%,#2a2a33 0);display:flex;align-items:center;justify-content:center"><div style="width:52px;height:52px;border-radius:50%;background:#16161b;display:flex;align-items:center;justify-content:center;font-weight:700">'+(na?'—':p+'%')+'</div></div><div class="small" style="margin-top:4px">'+x[0]+'</div></div>'}).join('')+'</div>'}
+
 function renderCarRx(){setTimeout(drawWH,0);
   var d=window.RX,lv=d.live||{},dm=lv.damage,ts=lv.tyresets;
   var row=function(a){return'<div class="row"><span>'+a[0]+'</span><span>'+a[1]+'%</span></div>'+bar(a[1],a[1]<20?'#19c250':a[1]<50?'#ffd400':'#e10600')};
   if(!dm){$('d_dmg').innerHTML='<div class="small">Sin paquete Car Damage.</div>';$('d_wear').innerHTML='';}
   else{var a=[['Alerón delantero izq.',dm.wing_fl],['Alerón delantero der.',dm.wing_fr],['Alerón trasero',dm.wing_r],['Suelo',dm.floor],['Difusor',dm.diffuser],['Pontones',dm.sidepod],['Caja de cambios',dm.gearbox],['Motor',dm.engine]];
-   $('d_dmg').innerHTML=a.map(row).join('')+'<div class="small">Fallo ERS: '+(dm.ers_fault?'sí':'no')+'</div>';
+   $('d_dmg').innerHTML=dmgHtml([['',dm.wing_fl,'wfl'],['',dm.wing_fr,'wfr'],['',dm.wing_r,'wr'],['',dm.floor,'floor'],['',dm.diffuser,'diff'],['',dm.sidepod,'side'],['',dm.gearbox,'gear'],['',dm.engine,'eng']],dm.ers_fault);
    var w=[['ICE',dm.w_ice],['MGU-K',dm.w_mguk],['Batería (ES)',dm.w_es],['Electrónica (CE)',dm.w_ce],['Turbo (TC)',dm.w_tc]];
-   $('d_wear').innerHTML=w.map(row).join('')+'<div class="small">MGU-H: N/A en 2026 (no hay prueba de que el juego lo use).</div>'}
+   $('d_wear').innerHTML=wearHtml(w)}
   if(!ts||!ts.length){$('d_sets').innerHTML='<div class="small">Sin paquete Tyre Sets.</div>';return}
   var g={},fit=null;ts.forEach(function(x){if(x.fitted)fit=x;else if(x.available){var k=[x.visual,x.wear,x.life,x.delta_ms].join();(g[k]=g[k]||{x:x,n:0}).n++}});
   var line=function(x,n,tag){return'<tr><td>'+(COMPN[x.visual]||'?')+(tag?' ('+tag+')':'')+(n>1?' ×'+n:'')+'</td><td>'+x.wear+'%</td><td>'+x.life+' vueltas</td><td>'+(x.delta_ms?(x.delta_ms/1000).toFixed(3)+' s':'—')+'</td></tr>'};
@@ -168,8 +187,8 @@ function renderCar(){
   var dm=[['Alerón delantero izq.',4],['Alerón delantero der.',0],['Alerón trasero',2],['Suelo',6],['Difusor',1],['Pontones',0],['Caja de cambios',3],['Motor',2]];
   var wr=[['ICE',12],['MGU-K',9],['Batería (ES)',10],['Electrónica (CE)',7],['Turbo (TC)',11]];
   var row=function(a){return'<div class="row"><span>'+a[0]+'</span><span>'+a[1]+'%</span></div>'+bar(a[1],a[1]<20?'#19c250':a[1]<50?'#ffd400':'#e10600')};
-  $('d_dmg').innerHTML=dm.map(row).join('')+'<div class="small">Fallo ERS: no</div>';
-  $('d_wear').innerHTML=wr.map(row).join('');
+  $('d_dmg').innerHTML=dmgHtml([['',dm[0][1],'wfl'],['',dm[1][1],'wfr'],['',dm[2][1],'wr'],['',dm[3][1],'floor'],['',dm[4][1],'diff'],['',dm[5][1],'side'],['',dm[6][1],'gear'],['',dm[7][1],'eng']],false);
+  $('d_wear').innerHTML=wearHtml(wr);
   var sets=[['Blando','S',1,'nuevo',0],['Medio','M',2,'usado en V1-V10',22],['Duro','H',2,'sin usar',0],['Duro','H',1,'sin usar',0]];
   $('d_sets').innerHTML='<table><tr><th>Juego</th><th>Desgaste</th><th>Vida restante</th><th>Notas</th></tr>'+sets.map(function(s,i){return'<tr><td>'+s[0]+' '+(i==1?'(montado)':'')+'</td><td>'+s[4]+'%</td><td>'+(20-s[4]/2|0)+' vueltas</td><td>'+s[3]+'</td></tr>'}).join('')+'</table>'}
 // ---- Datos ----
@@ -208,7 +227,7 @@ var AUDR=[
 ['Mapa real del circuito','Motion (posiciones); no hay trazado con licencia','Documentado, sin geometría validada','No implementado','No'],
 ['Delta en vivo contra una vuelta de referencia','No hay campo del juego','Cálculo propio posible, no implementado en directo','No implementado','No'],
 ['Ritmo de rivales con neumáticos y combustible comparables, «por qué» pierdes','Ningún campo','No disponible: ni el juego ni este programa lo dan','No disponible','—']];
-function AUD(){return'<div class="lbl">Auditoría: qué sale de la conexión de F1 26 en PS5</div><div class="small" style="margin:4px 0 8px">El documento oficial de EA que he leído es «F1 25 2026 Season Pack» (formato 2026; sus preguntas frecuentes citan F1 26). La PS5 envía por UDP por la red local a un PC con el programa receptor, no a esta web. «Probado en partida: No» en todo: solo he probado con paquetes simulados.</div><table><tr><th>Dato o función</th><th>Campo en el paquete</th><th>Tipo y límites</th><th>Estado</th><th>Probado en partida</th></tr>'+AUDR.map(function(r){return'<tr>'+r.map(function(c){return'<td>'+c+'</td>'}).join('')+'</tr>'}).join('')+'</table>'}
+function AUD(){return'<div class="lbl">Auditoría: qué sale de la conexión de F1 26 en PS5</div><div class="small" style="margin:4px 0 8px">El documento oficial de EA que he leído es «F1 25 2026 Season Pack» (formato 2026; sus preguntas frecuentes citan F1 26). La PS5 envía por UDP por la red local a este móvil (app receptora), no a una web. «Probado en partida: No» en todo: solo he probado con paquetes simulados.</div><table><tr><th>Dato o función</th><th>Campo en el paquete</th><th>Tipo y límites</th><th>Estado</th><th>Probado en partida</th></tr>'+AUDR.map(function(r){return'<tr>'+r.map(function(c){return'<td>'+c+'</td>'}).join('')+'</tr>'}).join('')+'</table>'}
 function renderInv(){
   $('d_inv').innerHTML=AUD()+'<div class="warn" style="margin:12px 0"><b>Lo que el programa lee hoy:</b> Car Telemetry (los 24 coches), Car Telemetry 2, Car Status, Lap Data (24 coches), Car Damage, Participants, Tyre Sets (solo tu coche), Session History (24 coches), Event y el principio de Session. <b>No lee todavía:</b> Session completo (previsión del tiempo, ventana de parada, safety car), Car Setups, Lap Positions, Motion / Motion Ex (mapa), Final Classification. La tabla de abajo es lo que el juego documenta, no lo que está implementado.</div><table><tr><th>Paquete (ID)</th><th>Datos que ofrece</th><th>Dónde se usa</th><th>Estado y límites</th></tr>'+INV.map(function(r){return'<tr><td><b>'+r[0]+'</b></td><td>'+r[1]+'</td><td>'+r[2]+'</td><td>'+r[3]+'</td></tr>'}).join('')+'</table>'}
 window.UI2={tick:tick,renderRace:renderRace,renderCar:renderCar,renderInv:renderInv};
