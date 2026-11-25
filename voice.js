@@ -3,6 +3,9 @@
 // servicio de reconocimiento de Google (NO es local). Etiquetado asi en la interfaz.
 // Diagnostico: los errores reales del navegador se exponen por onState ('speak-error', error)
 // para que la interfaz los muestre en vez de fallar en silencio.
+// Barge-in: en modo radio la escucha sigue activa mientras hablo; una frase del usuario
+// me interrumpe (guarda antieco: si el texto coincide con lo que estoy diciendo, es mi
+// propia voz por el altavoz y se ignora).
 (function(){
 var out={enabled:false,lastError:null,voiceName:null,speaking:false};
 var cbs=[];
@@ -17,8 +20,9 @@ function pickVoice(){
   var es=[],i;
   for(i=0;i<vs.length;i++)if(low(vs[i]).indexOf('es')===0)es.push(vs[i]);
   var g=es.filter(function(v){return /google/i.test(v.name);});
+  var local=es.filter(function(v){return v.localService&&low(v)==='es-es';});
   var exact=es.filter(function(v){return low(v)==='es-es';});
-  var v=g[0]||exact[0]||es[0]||vs[0];
+  var v=g[0]||local[0]||exact[0]||es[0]||vs[0];
   out.voiceName=v?v.name:null;
   return v;}
 if('speechSynthesis' in window){
@@ -34,31 +38,63 @@ function chunk(t){
   if(cur)res.push(cur);
   return res.map(function(s){return s.trim();}).filter(function(s){return s.length>0;});}
 
-function speakQueue(chunks,i,v){
-  if(i>=chunks.length||!out.enabled){out.speaking=false;emit('speak-end');return;}
+var spokenNow=''; // texto que estoy diciendo ahora mismo (para la guarda antieco)
+function norm(s){
+  return String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'')
+    .replace(/[^a-z0-9ñ ]+/g,' ').replace(/\s+/g,' ').trim();}
+
+// Guarda antieco: decide si una transcripcion es probablemente MI propia voz
+// (el altavoz reentrando por el micro) y no el usuario interrumpiendo.
+function looksEcho(txt){
+  var s=norm(spokenNow),t=norm(txt);
+  if(!s||!t)return false;
+  if(t.length>=8&&s.indexOf(t)>=0)return true; // frase entera contenida en lo hablado
+  var ws=t.split(' '),hit=0,tot=0;
+  for(var i=0;i<ws.length;i++){if(ws[i].length<3)continue;tot++;if(s.indexOf(ws[i])>=0)hit++;}
+  return tot>0&&hit/tot>=0.7;
+}
+
+var speakToken=0; // invalida la cola anterior al cancelar
+function interrupt(){
+  if(!out.speaking)return false;
+  speakToken++;
+  spokenNow='';
+  if('speechSynthesis' in window)window.speechSynthesis.cancel();
+  out.speaking=false;
+  emit('interrupted');
+  return true;}
+
+function speakQueue(chunks,i,v,tok){
+  if(tok!==speakToken){return;}
+  if(i>=chunks.length||!out.enabled){out.speaking=false;spokenNow='';emit('speak-end');return;}
+  spokenNow=chunks.slice(i).join(' ');
   var u=new SpeechSynthesisUtterance(chunks[i]);
-  u.lang='es-ES';u.rate=1.05;
+  u.lang='es-ES';u.rate=1.02;u.pitch=1.0;
   if(v)u.voice=v;
   out.speaking=true;emit('speak-start');
-  u.onend=function(){speakQueue(chunks,i+1,v);};
+  u.onend=function(){speakQueue(chunks,i+1,v,tok);};
   u.onerror=function(e){
-    out.speaking=false;
-    out.lastError=(e&&e.error)||'desconocido';
-    emit('speak-error',out.lastError);};
+    var err=(e&&e.error)||'desconocido';
+    // 'canceled'/'interrupted': cancelacion intencionada (nuevo speak o barge-in), no es fallo
+    if(err==='canceled'||err==='interrupted'){spokenNow='';return;}
+    out.speaking=false;spokenNow='';
+    out.lastError=err;
+    emit('speak-error',err);};
   window.speechSynthesis.speak(u);}
 
 function speak(text){
   if(!out.enabled||!('speechSynthesis' in window))return;
   var v=pickVoice();
   var chunks=chunk(text);
+  speakToken++;
   window.speechSynthesis.cancel();
   // pequena pausa tras cancel(): en algunos Chromium un speak inmediato se pierde (medida defensiva)
-  setTimeout(function(){speakQueue(chunks,0,v);},60);}
+  setTimeout(function(){speakQueue(chunks,0,v,speakToken);},60);}
 
 function toggle(){
   out.enabled=!out.enabled;
   out.lastError=null;
-  if(!out.enabled&&'speechSynthesis' in window)window.speechSynthesis.cancel();
+  if(!out.enabled){interrupt();}
   return out.enabled;}
 
 // Una sola escucha (compatibilidad): una pregunta por pulsacion.
@@ -74,6 +110,8 @@ function listen(onText,onSt){
 
 // Sesion de radio: escucha continua con un toque. Cada frase final pasa por onFinal.
 // Se rearma sola tras cortes del navegador; errores de permiso/dispositivo cierran la sesion.
+// h.bargeIn=true: no pausa la escucha mientras hablo; una frase real del usuario corta
+// la voz (interrupt) y se procesa. La guarda antieco descarta mi propia voz reentrada.
 function listenSession(h){
   h=h||{};
   var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
@@ -90,7 +128,12 @@ function listenSession(h){
     rec.onresult=function(e){
       for(var i=e.resultIndex;i<e.results.length;i++){
         if(!e.results[i].isFinal)continue;
-        if(h.onFinal)h.onFinal(e.results[i][0].transcript);}};
+        var txt=e.results[i][0].transcript;
+        if(h.bargeIn&&out.speaking){
+          if(looksEcho(txt))continue; // mi propia voz por el altavoz: ignorar
+          interrupt(); // el usuario habla: me callo y le escucho
+        }
+        if(h.onFinal)h.onFinal(txt);}};
     rec.onend=function(){
       rec=null;
       if(active)setTimeout(function(){start();},250);
@@ -123,6 +166,9 @@ function isStopCmd(txt){
 
 window.VOICE={speak:speak,toggle:toggle,listen:listen,listenSession:listenSession,
   filterPhrase:filterPhrase,isStopCmd:isStopCmd,chunk:chunk,onState:onState,
+  interrupt:interrupt,looksEcho:looksEcho,
+  isSpeaking:function(){return out.speaking;},
+  currentSpeech:function(){return spokenNow;},
   isOn:function(){return out.enabled;},
   lastError:function(){return out.lastError;},
   voiceName:function(){return out.voiceName;}};
