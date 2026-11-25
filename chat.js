@@ -173,7 +173,8 @@ function lapReport(n){
   parts.push('De ritmo, '+paceLine('rival',n)+'; y '+paceLine('rivalB',n)+'.');
   parts.push('Esto es lo que miden los datos; la causa de cada diferencia no se puede demostrar con esto.');
   mem.lap=n;mem.lastIntent='lap';mem.lastDeps=['jefe','telemetria','rivales'];
-  return parts.join(' ');}
+  var out=parts.join(' ');mem.lastAnswer=out;saveMem();
+  return out;}
 function statusReport(){
   var t1=lapTimeOf('you',1),t2=lapTimeOf('you',2);
   var parts=['Estado de la sesion (demo): vuelta 1 '+fmtLapT(t1)+', vuelta 2 '+fmtLapT(t2)+' ('+(t2<t1?'mejoras':'pierdes')+' '+Math.abs(t2-t1).toFixed(3)+' s).'];
