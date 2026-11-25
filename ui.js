@@ -97,14 +97,16 @@ function boot(){
     if(st==='speak-error'){
       el('voice-out').textContent='Voz: error';
       addMsg('bot','La voz ha fallado en este dispositivo (error del navegador: '+err+'). Revisa el volumen multimedia y la salida de voz del sistema; con ese error concreto puedo afinar la solucion.');}
-    if(st==='speak-start'&&session)session.pause();
-    if(st==='speak-end'&&session)session.resume();});
+    // barge-in: ya NO se pausa la escucha al hablar; la propia sesion (bargeIn:true)
+    // interrumpe la voz si el usuario habla (guarda antieco incluida en voice.js).
+    if(st==='interrupted')el('voice-in').textContent='Radio: ON';});
   function radioOff(silent){
     if(session){session.close();session=null;}
     el('voice-in').textContent='Micro';
     if(!silent)addMsg('bot','Sesion de radio cerrada. Toca Micro para abrirla de nuevo.');}
   function radioOn(){
     session=window.VOICE.listenSession({
+      bargeIn:true,
       onFinal:function(txt){
         txt=window.VOICE.filterPhrase(txt);
         if(!txt)return;
@@ -117,7 +119,7 @@ function boot(){
         else if(st==='unsupported'){addMsg('bot','Este navegador no tiene reconocimiento de voz.');radioOff(true);}
         else if(st.indexOf('error:')===0){addMsg('bot','El micro ha fallado ('+st.slice(6)+'). Sesion cerrada; revisa el permiso de micro del navegador.');radioOff(true);}}});
     if(!session){addMsg('bot','Este navegador no tiene reconocimiento de voz.');return;}
-    addMsg('bot','Modo radio abierto: habla cuando quieras, no hace falta tocar nada. Mientras te respondo en voz la escucha se pausa sola. Di "corta" o toca Micro para cerrar.');}
+    addMsg('bot','Modo radio abierto: habla cuando quieras, no hace falta tocar nada. Si hablas mientras te contesto, me callo y te escucho. Di "corta" o toca Micro para cerrar.');}
   el('voice-in').addEventListener('click',function(){
     if(session){radioOff();return;}
     if(micOK){radioOn();return;}
