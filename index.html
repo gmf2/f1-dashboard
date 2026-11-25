@@ -74,7 +74,7 @@ footer button{background:#0a84ff;color:#fff;border:none;border-radius:8px;paddin
 <nav id="tabs">
 <button class="tab on" data-tab="muro">Muro</button>
 <button class="tab" data-tab="box">El box</button>
-<button class="tab" data-tab="cockpit">Cockpit (demo 13 nov)</button>
+<button class="tab" data-tab="cockpit">Dashboard (demo)</button>
 </nav>
 <div class="tabpage" id="tab-muro">
 <section id="cards" aria-label="Panel de vuelta">
@@ -125,7 +125,7 @@ footer button{background:#0a84ff;color:#fff;border:none;border-radius:8px;paddin
     document.body.setAttribute('data-tab',k);
     if(k==='box'&&!loaded){loaded=true;frame.src='box.html?v=15';}
     if(k==='box'&&loaded){try{frame.contentWindow.dispatchEvent(new Event('resize'));}catch(e){}}
-    if(k==='cockpit'&&!loadedC){loadedC=true;cock.src='dashboard.html?v=2';}
+    if(k==='cockpit'&&!loadedC){loadedC=true;cock.src='dashboard.html?v=3';}
   });});
 })();
 </script>
