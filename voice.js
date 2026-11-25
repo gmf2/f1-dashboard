@@ -7,6 +7,14 @@
 // me interrumpe (guarda antieco: si el texto coincide con lo que estoy diciendo, es mi
 // propia voz por el altavoz y se ignora).
 (function(){
+/* Backend nativo de la APK (v1.3): si el puente Android ofrece reconocimiento
+   ON-DEVICE (SpeechRecognizer local, sin descargas) y TTS del sistema, se usa
+   ese camino y el audio no sale del dispositivo. Si no, se mantiene el motor
+   del navegador (web) y, si tampoco, la interfaz cae a texto con explicacion. */
+var NAT=(function(){
+  try{return typeof window!=='undefined'&&window.Android
+    &&typeof window.Android.speechAvailable==='function'
+    &&window.Android.speechAvailable()==='1';}catch(e){return false;}})();
 var out={enabled:false,lastError:null,voiceName:null,speaking:false};
 var cbs=[];
 function emit(st,err){for(var i=0;i<cbs.length;i++){try{cbs[i](st,err);}catch(e){}}}
@@ -76,7 +84,8 @@ function interrupt(){
   if(!out.speaking)return false;
   speakToken++;
   spokenNow='';
-  if('speechSynthesis' in window)window.speechSynthesis.cancel();
+  if(NAT){try{window.Android.ttsStop();}catch(e){}}
+  else if('speechSynthesis' in window)window.speechSynthesis.cancel();
   out.speaking=false;
   emit('interrupted');
   return true;}
@@ -99,8 +108,25 @@ function speakQueue(chunks,i,v,tok){
     emit('speak-error',err);};
   window.speechSynthesis.speak(u);}
 
+var natQueue=[];
+function natSpeakNext(tok){
+  if(tok!==speakToken)return;
+  if(!natQueue.length||!out.enabled){out.speaking=false;spokenNow='';emit('speak-end');return;}
+  var c=natQueue.shift();
+  spokenNow=c;
+  out.speaking=true;emit('speak-start');
+  window.__f1ttsdone=function(){natSpeakNext(tok);};
+  try{window.Android.ttsSpeak(c);}catch(e){natSpeakNext(tok);}}
 function speak(text){
-  if(!out.enabled||!('speechSynthesis' in window))return;
+  if(!out.enabled)return;
+  if(NAT){
+    var chunksN=chunk(text);
+    speakToken++;
+    try{window.Android.ttsStop();}catch(e){}
+    natQueue=chunksN.slice();
+    natSpeakNext(speakToken);
+    return;}
+  if(!('speechSynthesis' in window))return;
   var v=pickVoice();
   var chunks=chunk(text);
   speakToken++;
@@ -114,8 +140,49 @@ function toggle(){
   if(!out.enabled){interrupt();}
   return out.enabled;}
 
+// Sesion nativa: SpeechRecognizer en dispositivo via puente Android.
+// El reconocedor nativo entrega una frase por escucha: se rearma tras cada
+// resultado o error recuperable (misma idea que la sesion web).
+function natSession(h){
+  h=h||{};
+  var active=true;
+  function restart(){
+    if(!active)return;
+    setTimeout(function(){
+      if(!active)return;
+      try{window.Android.speechStart('es-ES');}
+      catch(e){active=false;h.onState&&h.onState('error:start');}},250);}
+  window.__f1speechready=function(){};
+  window.__f1speechpartial=function(){};
+  window.__f1speech=function(txt,conf){
+    if(!active)return;
+    txt=String(txt||'');
+    if(!txt){restart();return;}
+    if(h.bargeIn&&out.speaking){
+      if(looksEcho(txt)){restart();return;} // mi propia voz por el altavoz
+      interrupt();}
+    if(h.onFinal)h.onFinal(txt);
+    restart();};
+  window.__f1speecherr=function(err){
+    if(!active)return;
+    err=String(err);
+    if(err==='permiso_denegado'){active=false;h.onState&&h.onState('error:not-allowed');return;}
+    h.onState&&h.onState('warn:nativo-'+err);
+    restart();};
+  try{window.Android.speechStart('es-ES');}
+  catch(e){h.onState&&h.onState('error:start');return null;}
+  h.onState&&h.onState('listening');
+  return {
+    pause:function(){try{window.Android.speechStop();}catch(e){}},
+    resume:function(){restart();},
+    close:function(){active=false;try{window.Android.speechStop();}catch(e){}h.onState&&h.onState('idle');},
+    isActive:function(){return active;}};}
+
 // Una sola escucha (compatibilidad): una pregunta por pulsacion.
 function listen(onText,onSt){
+  if(NAT){
+    var ses=natSession({onFinal:function(txt){onText(txt);},onState:onSt});
+    return ses;}
   var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
   if(!SR){onSt&&onSt('unsupported');return null;}
   var r=new SR();r.lang='es-ES';r.interimResults=false;
@@ -131,6 +198,7 @@ function listen(onText,onSt){
 // la voz (interrupt) y se procesa. La guarda antieco descarta mi propia voz reentrada.
 function listenSession(h){
   h=h||{};
+  if(NAT)return natSession(h);
   var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
   if(!SR){h.onState&&h.onState('unsupported');return null;}
   var rec=null,active=true,netFails=0,restarts=[];
@@ -181,7 +249,7 @@ function isStopCmd(txt){
   return /^(corta|termina|cierra)( (el |la )?(micro|radio|sesion|escucha))?[!.]?$/.test(t)
       || /^(para|callate) (el |la )?(micro|radio|sesion|escucha)[!.]?$/.test(t);}
 
-window.VOICE={speak:speak,toggle:toggle,listen:listen,listenSession:listenSession,
+window.VOICE={speak:speak,toggle:toggle,listen:listen,listenSession:listenSession,native:function(){return NAT;},
   filterPhrase:filterPhrase,isStopCmd:isStopCmd,chunk:chunk,onState:onState,
   interrupt:interrupt,looksEcho:looksEcho,isRepeatCmd:isRepeatCmd,
   isSpeaking:function(){return out.speaking;},
