@@ -30,7 +30,7 @@
 <body>
 <div id="top"><b>El box</b><span>Equipo de ingenieria · demo Monza</span><span style="flex:1"></span><button id="voz" style="background:#141c28;border:1px solid #22304a;color:#dfe6ee;border-radius:8px;padding:4px 10px;font-size:13px;cursor:pointer">Voz: OFF</button><button id="micro" style="background:#141c28;border:1px solid #22304a;color:#dfe6ee;border-radius:8px;padding:4px 10px;font-size:13px;cursor:pointer">Micro</button><a href="index.html">&larr; Muro de boxes</a></div>
 <script>if(window.self!==window.top){var l=document.querySelector("#top a");if(l)l.style.display="none";}</script>
-<div id="mic-consent" style="display:none;padding:8px 14px;background:#1a2f4a;font-size:13px;line-height:1.4">El micro usa el reconocimiento de voz del navegador: en Chrome el audio lo procesa el servicio de Google (no es local). La voz que habla es sintesis del navegador: local o en red segun la voz instalada. <button id="mic-yes" style="background:#1d5fd0;border:0;border-radius:6px;color:#fff;padding:4px 10px;margin-left:6px;cursor:pointer">Entendido, activar micro</button> <button id="mic-no" style="background:#141c28;border:1px solid #22304a;color:#dfe6ee;border-radius:6px;padding:4px 10px;cursor:pointer">Ahora no</button></div>
+<div id="mic-consent" style="display:none;padding:8px 14px;background:#1a2f4a;font-size:13px;line-height:1.4">El micro usa el reconocimiento de voz del navegador: en Chrome el audio lo procesa el servicio de Google (no es local). En modo radio la escucha sigue abierta entre preguntas hasta que la cierres (otro toque o di "corta"). La voz que habla es sintesis del navegador: local o en red segun la voz instalada. <button id="mic-yes" style="background:#1d5fd0;border:0;border-radius:6px;color:#fff;padding:4px 10px;margin-left:6px;cursor:pointer">Entendido, activar micro</button> <button id="mic-no" style="background:#141c28;border:1px solid #22304a;color:#dfe6ee;border-radius:6px;padding:4px 10px;cursor:pointer">Ahora no</button></div>
 <div id="main">
   <div id="view"><div id="fallback">Este navegador no ha podido iniciar WebGL; el chat de la derecha sigue funcionando igual.</div></div>
   <div id="side">
@@ -44,8 +44,8 @@
 <script src="laps-demo.js?v=6"></script>
 <script src="analysis.js?v=6"></script>
 <script src="chat.js?v=15"></script>
-<script src="voice.js?v=6"></script>
+<script src="voice.js?v=9"></script>
 <script type="importmap">{"imports":{"three":"./three.module.min.js"}}</script>
-<script type="module" src="box.js?v=14"></script>
+<script type="module" src="box.js?v=15"></script>
 </body>
 </html>
