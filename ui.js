@@ -111,8 +111,9 @@ function boot(){
         if(window.VOICE.isStopCmd(txt)){radioOff();return;}
         ask(txt);},
       onState:function(st){
-        if(st==='listening')el('voice-in').textContent='Radio: ON';
-        else if(st==='idle')el('voice-in').textContent='Micro';
+        var b=el('btn-radio');
+        if(st==='listening'){el('voice-in').textContent='Radio: ON';if(b)b.textContent='🎙 Cerrar radio';}
+        else if(st==='idle'){el('voice-in').textContent='Micro';if(b)b.textContent='🎙 Abrir radio';}
         else if(st==='unsupported'){addMsg('bot','Este navegador no tiene reconocimiento de voz.');radioOff(true);}
         else if(st.indexOf('error:')===0){addMsg('bot','El micro ha fallado ('+st.slice(6)+'). Sesion cerrada; revisa el permiso de micro del navegador.');radioOff(true);}}});
     if(!session){addMsg('bot','Este navegador no tiene reconocimiento de voz.');return;}
@@ -123,6 +124,11 @@ function boot(){
     el('mic-consent').style.display='block';});
   el('mic-yes').addEventListener('click',function(){micOK=true;el('mic-consent').style.display='none';radioOn();});
   el('mic-no').addEventListener('click',function(){el('mic-consent').style.display='none';});
+  var brp=el('btn-repeat');if(brp)brp.addEventListener('click',function(){ask('repite');});
+  var brd=el('btn-radio');if(brd)brd.addEventListener('click',function(){
+    if(session){radioOff();return;}
+    if(micOK){radioOn();return;}
+    el('mic-consent').style.display='block';});
   el('lapdemo').addEventListener('click',function(){
     var r=window.CHAT.lapReport(lapN+1);
     if(r===null){addMsg('bot','Solo hay 2 vueltas de demostracion cargadas; el aviso automatico por vuelta en directo llegaria con los datos reales.');return;}
