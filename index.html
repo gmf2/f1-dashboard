@@ -15,7 +15,7 @@ header button{background:#2c2c2e;color:#f5f5f5;border:1px solid #444;border-radi
 .tab{padding:8px 20px;border-radius:20px;background:#2c2c2e;color:#f5f5f5;border:1px solid #444;font-size:14px;cursor:pointer}
 .tab.on{background:#0a84ff;border-color:#0a84ff;color:#fff}
 #tabs a{color:#0a84ff;font-size:12px;margin-left:auto}
-body[data-tab=box] #voice-out,body[data-tab=box] #voice-in,body[data-tab=box] #demo,body[data-tab=cockpit] #voice-out,body[data-tab=cockpit] #voice-in,body[data-tab=cockpit] #demo{display:none}
+body[data-tab=box] #voice-out,body[data-tab=box] #voice-in,body[data-tab=box] #lapdemo,body[data-tab=box] #demo,body[data-tab=cockpit] #voice-out,body[data-tab=cockpit] #voice-in,body[data-tab=cockpit] #lapdemo,body[data-tab=cockpit] #demo{display:none}
 .tabpage{flex:1;display:flex;flex-direction:column;min-height:0}
 .tabpage[hidden]{display:none}
 #boxframe,#cockpitframe{flex:1;border:0;width:100%;background:#05070c}
@@ -32,6 +32,30 @@ footer{display:flex;gap:8px;padding:10px;border-top:1px solid #333}
 footer input{flex:1;background:#1c1c1e;border:1px solid #444;border-radius:8px;color:#f5f5f5;padding:10px;font-size:14px}
 footer button{background:#0a84ff;color:#fff;border:none;border-radius:8px;padding:10px 16px;font-size:14px}
 @media(max-width:720px){main{flex-direction:column-reverse}#side{width:auto;border-left:none;border-top:1px solid #333}#map svg{max-height:220px}}
+#cards{display:grid;grid-template-columns:1.25fr 1fr;gap:10px;padding:10px 12px 0}
+#cards .card{background:#10151c;border:1px solid #1e2631;border-radius:14px;padding:10px 14px;display:flex;flex-direction:column;justify-content:center}
+#cards .lab{font-size:11px;font-weight:700;letter-spacing:1.2px;color:#8fa1b5;text-transform:uppercase}
+#cards .big{font-size:44px;font-weight:800;line-height:1.05;font-variant-numeric:tabular-nums}
+#cards .mid{font-size:22px;font-weight:700;font-variant-numeric:tabular-nums}
+#cards .sub{font-size:12px;color:#9fb0c3;margin-top:3px}
+#cards .good{color:#3ddc84}#cards .bad{color:#ff5a5a}
+#cards .band{grid-column:1/-1;display:flex;flex-direction:row;justify-content:space-around;text-align:center;gap:8px}
+#cards .band .col{display:flex;flex-direction:column;gap:2px}
+#cards table.t{width:100%;border-collapse:collapse;margin-top:4px}
+#cards table.t td{font-size:14px;padding:2px 0;font-variant-numeric:tabular-nums;color:#dfe7f0}
+#cards table.t td:last-child{text-align:right;color:#9fb0c3}
+#cards table.t tr.me td{color:#ffd479;font-weight:700}
+#cards .sect{display:flex;gap:8px;margin-top:6px}
+#cards .sect .s{flex:1;background:#161e29;border-radius:10px;padding:6px;text-align:center}
+#cards .sect .s .v{font-size:19px;font-weight:800;font-variant-numeric:tabular-nums}
+#cards .sect .s .l{font-size:10px;color:#8fa1b5;margin-top:2px}
+#cards .nodata{grid-column:1/-1;border:1px dashed #334052;background:#0c1117;border-radius:10px;padding:6px 12px;font-size:11px;color:#7c8a9d}
+#cards .demotag{grid-column:1/-1;font-size:10px;color:#5f6f83;text-align:right;margin-top:-4px}
+#actions{display:flex;gap:10px;padding:10px 12px 0}
+#actions .btn{flex:1;background:#17324f;border:1px solid #2c5a86;border-radius:12px;padding:10px;font-size:15px;font-weight:700;color:#dbe9f7;text-align:center;cursor:pointer}
+#actions .btn.radio{background:#123f2a;border-color:#1f6b45;color:#a7f3c7}
+@media(max-width:720px){#cards{grid-template-columns:1fr 1fr}#cards .big{font-size:32px}}
+
 </style>
 </head>
 <body>
@@ -39,7 +63,8 @@ footer button{background:#0a84ff;color:#fff;border:none;border-radius:8px;paddin
 <h1>Muro de boxes · Monza</h1>
 <button id="voice-out">Voz: OFF</button>
 <button id="voice-in" title="Reconocimiento del navegador; en Chrome lo procesa Google, no es local">Micro</button>
-<div id="mic-consent" style="display:none;width:100%;font-size:12px;background:#3a2c00;color:#f5f5f5;padding:6px 8px;border-radius:6px">Antes de activarlo: el micro usa el reconocimiento de voz del navegador y en Chrome el audio lo procesa Google (no es local). Se activa solo mientras escucha tu pregunta. <button id="mic-yes" style="background:#0a84ff;color:#fff;border:none;border-radius:6px;padding:4px 8px">Entendido, activar micro</button> <button id="mic-no" style="background:#2c2c2e;color:#f5f5f5;border:1px solid #444;border-radius:6px;padding:4px 8px">Ahora no</button></div>
+<button id="lapdemo" title="Simula el aviso del ingeniero al completarse una vuelta (datos demo)">Vuelta (demo)</button>
+<div id="mic-consent" style="display:none;width:100%;font-size:12px;background:#3a2c00;color:#f5f5f5;padding:6px 8px;border-radius:6px">Antes de activarlo: el micro usa el reconocimiento de voz del navegador y en Chrome el audio lo procesa Google (no es local). En modo radio la escucha sigue abierta entre preguntas hasta que la cierres con otro toque o diciendo "corta". <button id="mic-yes" style="background:#0a84ff;color:#fff;border:none;border-radius:6px;padding:4px 8px">Entendido, activar micro</button> <button id="mic-no" style="background:#2c2c2e;color:#f5f5f5;border:1px solid #444;border-radius:6px;padding:4px 8px">Ahora no</button></div>
 <div id="demo">Datos de demostracion (trazas sinteticas sobre geometria real OSM; curvas contrastadas FIA + hotlapdelta). Analisis sin IA, solo calculo local. Voz: sintesis del navegador (local o en red segun la voz); el micro usa el reconocimiento del navegador (en Chrome lo procesa Google). La meta es traer las trazas reales (velocidad, freno y acelerador) por la APK, aun en desarrollo; posicion en pista y meteo no estan verificados.</div>
 </header>
 <nav id="tabs">
@@ -48,6 +73,23 @@ footer button{background:#0a84ff;color:#fff;border:none;border-radius:8px;paddin
 <button class="tab" data-tab="cockpit">Cockpit (demo 13 nov)</button>
 </nav>
 <div class="tabpage" id="tab-muro">
+<section id="cards" aria-label="Panel de vuelta">
+<div class="card"><div class="lab">Vs el de delante (vuelta 2)</div><div class="big" id="c-delta">-</div><div class="sub" id="c-delta-sub"></div></div>
+<div class="card"><div class="lab">Última vuelta (2)</div><div class="big" id="c-lap">-</div><div class="sub" id="c-lap-sub"></div></div>
+<div class="card band">
+<div class="col"><div class="lab">Ritmo vs delante</div><div class="mid" id="c-front">-</div></div>
+<div class="col"><div class="lab">Vueltas</div><div class="mid">2</div><div class="sub">demo</div></div>
+<div class="col"><div class="lab">Ritmo vs detrás</div><div class="mid" id="c-behind">-</div></div>
+</div>
+<div class="card"><div class="lab">Dónde pierdes (vuelta 2)</div><div class="mid bad" id="c-worst">-</div><div class="sub" id="c-worst-sub"></div></div>
+<div class="card"><div class="lab">Tercios de la última vuelta</div><div class="sect" id="c-sect"></div><div class="sub">tercios de vuelta por distancia (la demo no tiene líneas de sector oficiales)</div></div>
+<div class="nodata">Intervalo real en carrera, posiciones, desgaste de neumático y meteo: sin datos en esta demo. La comparativa por curva sí está calculada de las trazas demo.</div>
+<div class="demotag">datos de demostración · trazas sintéticas</div>
+</section>
+<div id="actions">
+<button class="btn" id="btn-repeat" type="button">🔁 Repetir última respuesta</button>
+<button class="btn radio" id="btn-radio" type="button">🎙 Abrir radio</button>
+</div>
 <main>
 <div id="chat"></div>
 <div id="side">
@@ -88,7 +130,7 @@ footer button{background:#0a84ff;color:#fff;border:none;border-radius:8px;paddin
 <script src="analysis.js?v=7"></script>
 <script src="chat.js?v=15"></script>
 <script src="voice.js?v=7"></script>
-<script src="ui.js?v=8"></script>
+<script src="ui.js?v=9"></script>
 <script>window.UI.boot();</script>
 </body>
 </html>
