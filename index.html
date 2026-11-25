@@ -27,6 +27,8 @@ main{flex:1;display:flex;min-height:0}
 .msg.bot{align-self:flex-start;background:#2c2c2e}
 #side{width:300px;flex:none;border-left:1px solid #333;padding:8px;display:flex;flex-direction:column;min-height:0;overflow-y:auto}
 #side h2{font-size:12px;color:#999;margin:4px 0}
+#map{flex:1;min-height:0;display:flex;flex-direction:column}
+#map svg{flex:1;min-height:0;max-height:100%;width:100%}
 #legend{font-size:11px;color:#999}
 #legend span{display:inline-block;width:10px;height:10px;border-radius:2px;margin:0 4px 0 8px;vertical-align:middle}
 footer{display:flex;gap:8px;padding:10px;border-top:1px solid #333}
@@ -36,7 +38,7 @@ footer button{background:#0a84ff;color:#fff;border:none;border-radius:8px;paddin
 #cards{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:10px;padding:10px 12px 0}
 #cards .card{background:#10151c;border:1px solid #1e2631;border-radius:14px;padding:10px 14px;display:flex;flex-direction:column;justify-content:center}
 #cards .lab{font-size:11px;font-weight:700;letter-spacing:1.2px;color:#8fa1b5;text-transform:uppercase}
-#cards .big{font-size:44px;font-weight:800;line-height:1.05;font-variant-numeric:tabular-nums}
+#cards .big{font-size:clamp(30px,4.2vw,44px);font-weight:800;line-height:1.05;font-variant-numeric:tabular-nums;white-space:nowrap}
 #cards .mid{font-size:22px;font-weight:700;font-variant-numeric:tabular-nums}
 #cards .sub{font-size:12px;color:#9fb0c3;margin-top:3px}
 #cards .good{color:#3ddc84}#cards .bad{color:#ff5a5a}
