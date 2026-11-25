@@ -85,14 +85,17 @@ function renderLiveCards(st){
   var bl3=document.querySelector('#cards .band .col:nth-child(3) .lab');
   if(bl3)bl3.textContent='Hueco al lider';
   document.querySelector('#cards .card:nth-child(1) .lab').textContent='Posicion (en directo)';
+  if(window.__f1bootmsg&&!window.__f1bootupd){window.__f1bootupd=1;window.__f1bootmsg.textContent='Muro de boxes. Datos en directo: todo lo que ves es tu telemetria real del juego.';}
   el('c-delta').textContent=lp?'P'+lp.pos:'-';
   el('c-delta').className='big';
   el('c-delta-sub').textContent=lp?('vuelta '+lp.lap+(st.live.track&&st.live.track.total_laps?' de '+st.live.track.total_laps:'')):'sin lapdata aun';
   document.querySelector('#cards .card:nth-child(2) .lab').textContent='Ultima vuelta';
   el('c-lap').textContent=lp&&lp.last_ms?fmtS(lp.last_ms/1000):'-';
   el('c-lap-sub').textContent=lp&&lp.last_ms?'en directo':'sin vuelta cerrada aun';
-  el('c-front').textContent=lp?gap(lp.front):'-';
-  el('c-behind').textContent=lp?gap(lp.leader):'-';
+  var esLider=lp&&lp.pos===1;
+  el('c-front').textContent=(lp&&!esLider)?gap(lp.front):'-';
+  el('c-behind').textContent=(lp&&!esLider)?gap(lp.leader):'-';
+  if(lp&&esLider){var sbB=el('c-behind');if(sbB)sbB.title='Eres el lider';}
   var midc2=document.querySelector('#cards .band .col:nth-child(2)');
   if(midc2){midc2.querySelector('.mid').textContent=lp?String(lp.lap):'-';var sb3=midc2.querySelector('.sub');if(sb3)sb3.textContent=(st.live.track&&st.live.track.total_laps)?'de '+st.live.track.total_laps:'';}
   var worstLab=document.querySelector('#cards .card:nth-child(4) .lab');
@@ -250,7 +253,8 @@ function boot(){
     if(vi)vi.title='Reconocimiento en el dispositivo (on-device); el audio no sale de la tablet';
   }
   if(inApk&&!liveSt()&&window.F1MODE&&window.F1MODE()!=='demo'){
-    addMsg('bot','Muro de boxes. Estoy esperando la telemetria del juego (UDP 20777): activala en Ajustes > Telemetria del F1 25 con esta IP. Cuando llegue, todo lo que veas sera en directo. Si quieres practicar, toca "Ver demostracion".');}
+    addMsg('bot','Muro de boxes. Estoy esperando la telemetria del juego (UDP 20777): activala en Ajustes > Telemetria del F1 25 con esta IP. Cuando llegue, todo lo que veas sera en directo. Si quieres practicar, toca "Ver demostracion".');
+    window.__f1bootmsg=el('chat').lastChild;}
   else addMsg('bot','Muro de boxes en demostracion: datos de ejemplo de Monza, no una sesion real. Pregunta por curvas, frenadas, rivales o vueltas, o charlemos. Con la APK y el juego en marcha, "Ver en directo" muestra tu telemetria real.');
   renderCtx();
   addEventListener('storage',function(e){if(e.key==='f1-chat-mem-v1')renderCtx();});
