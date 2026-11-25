@@ -27,7 +27,7 @@ function drawMap(deltaSeg){
   s+='<rect x="'+(px(xs[0])-6)+'" y="'+(py(ys[0])-3)+'" width="12" height="6" fill="#f5f5f5"/>';
   s+='</svg>';
   svg.innerHTML=s;
-  svg.querySelectorAll('.corner').forEach(function(g){
+  if(!window.__F1MAPLIVE)svg.querySelectorAll('.corner').forEach(function(g){
     g.style.cursor='pointer';
     g.addEventListener('click',function(){ask('curva '+g.getAttribute('data-n'));});});}
 function currentDeltaSeg(){
@@ -47,7 +47,137 @@ function ask(text){
   drawMap(currentDeltaSeg());renderCtx();}
 
 function fmtS(t){var m=Math.floor(t/60),ss=(t-m*60).toFixed(3);return m+':'+(ss<10?'0':'')+ss;}
+/* v1.3: con telemetria viva las tarjetas pasan a directo (misma fuente unica RXAPP
+   del marco superior); sin paquetes frescos queda la demo EXPLICITA de siempre. */
+/* Titulo/mapa/avisos segun modo: en vivo el circuito solo se nombra si llega
+   en los paquetes; el mapa solo se muestra con geometria disponible (Monza)
+   y entonces en neutro (sin colores ni clics de la demo). */
+function setChrome(mode,trackId){
+  var t=el('app-title');
+  var nm=(mode==='live'&&trackId!==null&&trackId!==undefined&&window.EA_TRACKS)?window.EA_TRACKS[String(trackId)]:null;
+  if(t){
+    if(mode==='demo')t.textContent='Muro de boxes · Monza';
+    else if(mode==='live'&&nm)t.textContent='Muro de boxes · '+nm;
+    else t.textContent='Muro de boxes';}
+  var side=el('side'),leg=el('legend');
+  var showMap=(mode==='demo')||(mode==='live'&&nm==='Monza');
+  window.__F1MAPLIVE=(mode==='live');
+  if(side)side.style.display=showMap?'':'none';
+  if(leg)leg.style.display=(mode==='demo')?'':'none';
+  if(showMap&&el('map')&&window.TRACK_MONZA){
+    drawMap(mode==='demo'?safeSeg():null);}}
+function safeSeg(){try{return currentDeltaSeg();}catch(e){return null;}}
+function liveSt(){
+  try{
+    if(!window.RXAPP)return null;
+    var st=window.RXAPP.route('/state');
+    if(st&&st.packets>0&&st.age!==null&&st.age<3)return st;
+  }catch(e){}
+  return null;}
+function renderLiveCards(st){
+  var L=window.LAPS_DEMO;if(!el('cards'))return;
+  function lab(id,txt){var e=el(id);if(e&&e.previousElementSibling)e.previousElementSibling.textContent=txt;}
+  function gap(msv){if(msv===null||msv===undefined)return '-';return (msv>=0?'+':'-')+(Math.abs(msv)/1000).toFixed(3).replace('.',',')+' s';}
+  var lp=st.live&&st.live.lap,tel=st.live&&st.live.tel,stt=st.live&&st.live.status;
+  setChrome('live',st.live.track&&st.live.track.id);
+  var bl1=document.querySelector('#cards .band .col:nth-child(1) .lab');
+  if(bl1)bl1.textContent='Hueco al de delante';
+  var bl3=document.querySelector('#cards .band .col:nth-child(3) .lab');
+  if(bl3)bl3.textContent='Hueco al lider';
+  document.querySelector('#cards .card:nth-child(1) .lab').textContent='Posicion (en directo)';
+  el('c-delta').textContent=lp?'P'+lp.pos:'-';
+  el('c-delta').className='big';
+  el('c-delta-sub').textContent=lp?('vuelta '+lp.lap+(st.live.track&&st.live.track.total_laps?' de '+st.live.track.total_laps:'')):'sin lapdata aun';
+  document.querySelector('#cards .card:nth-child(2) .lab').textContent='Ultima vuelta';
+  el('c-lap').textContent=lp&&lp.last_ms?fmtS(lp.last_ms/1000):'-';
+  el('c-lap-sub').textContent=lp&&lp.last_ms?'en directo':'sin vuelta cerrada aun';
+  el('c-front').textContent=lp?gap(lp.front):'-';
+  el('c-behind').textContent=lp?gap(lp.leader):'-';
+  var midc2=document.querySelector('#cards .band .col:nth-child(2)');
+  if(midc2){midc2.querySelector('.mid').textContent=lp?String(lp.lap):'-';var sb3=midc2.querySelector('.sub');if(sb3)sb3.textContent=(st.live.track&&st.live.track.total_laps)?'de '+st.live.track.total_laps:'';}
+  var worstLab=document.querySelector('#cards .card:nth-child(4) .lab');
+  if(worstLab)worstLab.textContent='Velocidad / marcha';
+  el('c-worst').textContent=tel?(tel.speed+' km/h · M'+tel.gear):'-';
+  el('c-worst').className='mid';
+  el('c-worst-sub').textContent=tel?('acelerador '+Math.round(tel.throttle*100)+'% · freno '+Math.round(tel.brake*100)+'%'):'';
+  var c5=document.querySelector('#cards .card:nth-child(5)');
+  if(!stt){if(c5)c5.style.display='none';}
+  else{
+  if(c5)c5.style.display='';
+  var l5b=document.querySelector('#cards .card:nth-child(5) .lab');
+  if(l5b)l5b.textContent='ERS / combustible / gomas';
+  var l5c=document.querySelector('#cards .card:nth-child(5) .sub');
+  if(l5c)l5c.textContent='';
+  var sect=el('c-sect');
+  if(stt){
+    sect.innerHTML='<div class="s"><div class="v">'+stt.ers_mode+'</div><div class="l">MODO ERS</div></div>'+
+      '<div class="s"><div class="v">'+(stt.fuel_laps!=null?stt.fuel_laps.toFixed(1):'-')+'</div><div class="l">VUELTAS GAS</div></div>'+
+      '<div class="s"><div class="v">'+(stt.tyre_age!=null?stt.tyre_age:'-')+'</div><div class="l">EDAD GOMAS</div></div>';}
+  }
+  var nd=document.querySelector('#cards .nodata');
+  if(nd)nd.textContent='En directo por telemetria UDP del juego. Desgaste detallado, meteo y huecos durante SC no se muestran aqui.';
+  var dt=document.querySelector('#cards .demotag');
+  if(dt)dt.textContent='EN DIRECTO · telemetria del juego';
+}
+function apkMode(){return typeof window.Android!=='undefined';}
+function demoMode(){return !apkMode()||(window.F1MODE&&window.F1MODE()==='demo');}
+function renderNoDataCards(){
+  if(!el('cards'))return;
+  setChrome('nodata',null);
+  var c5n=document.querySelector('#cards .card:nth-child(5)');
+  if(c5n)c5n.style.display='';
+  var bl1n=document.querySelector('#cards .band .col:nth-child(1) .lab');
+  if(bl1n)bl1n.textContent='Ritmo vs delante';
+  var bl3n=document.querySelector('#cards .band .col:nth-child(3) .lab');
+  if(bl3n)bl3n.textContent='Ritmo vs detras';
+  var l1=document.querySelector('#cards .card:nth-child(1) .lab');
+  if(l1)l1.textContent='Posicion';
+  var l2=document.querySelector('#cards .card:nth-child(2) .lab');
+  if(l2)l2.textContent='Ultima vuelta';
+  var l4=document.querySelector('#cards .card:nth-child(4) .lab');
+  if(l4)l4.textContent='Velocidad / marcha';
+  el('c-delta').textContent='-';el('c-delta').className='big';
+  el('c-delta-sub').textContent='';
+  el('c-lap').textContent='-';el('c-lap-sub').textContent='';
+  el('c-front').textContent='-';el('c-behind').textContent='-';
+  var midc=document.querySelector('#cards .band .col:nth-child(2)');
+  if(midc){midc.querySelector('.mid').textContent='-';var sb2=midc.querySelector('.sub');if(sb2)sb2.textContent='';}
+  el('c-worst').textContent='-';el('c-worst').className='mid';el('c-worst-sub').textContent='';
+  el('c-sect').innerHTML='';
+  var l5=document.querySelector('#cards .card:nth-child(5) .lab');
+  if(l5)l5.textContent='Tercios de la ultima vuelta';
+  var l5s=document.querySelector('#cards .card:nth-child(5) .sub');
+  if(l5s)l5s.textContent='';
+  var nd=document.querySelector('#cards .nodata');
+  if(nd)nd.textContent='Sin datos en directo: la app espera telemetria del juego (UDP puerto 20777, activada en Ajustes de telemetria del F1 25). Puedes ver la demostracion con el boton de arriba; nunca se sustituye sola.';
+  var dt=document.querySelector('#cards .demotag');
+  if(dt)dt.textContent='SIN DATOS · esperando telemetria';
+}
 function renderCards(){
+  var st=liveSt();
+  if(st){renderLiveCards(st);return;}
+  if(!demoMode()){renderNoDataCards();return;}
+  setChrome('demo',null);
+  var c5d=document.querySelector('#cards .card:nth-child(5)');
+  if(c5d)c5d.style.display='';
+  var d1=document.querySelector('#cards .card:nth-child(1) .lab');
+  if(d1)d1.textContent='Vs el de delante (vuelta 2)';
+  var d2=document.querySelector('#cards .card:nth-child(2) .lab');
+  if(d2)d2.textContent='Última vuelta (2)';
+  var d4=document.querySelector('#cards .card:nth-child(4) .lab');
+  if(d4)d4.textContent='Dónde pierdes (vuelta 2)';
+  var d5=document.querySelector('#cards .card:nth-child(5) .lab');
+  if(d5)d5.textContent='Tercios de la última vuelta';
+  var d5s=document.querySelector('#cards .card:nth-child(5) .sub');
+  if(d5s)d5s.textContent='tercios de vuelta por distancia (la demo no tiene líneas de sector oficiales)';
+  var ndd=document.querySelector('#cards .nodata');
+  if(ndd)ndd.textContent='Intervalo real en carrera, posiciones, desgaste de neumático y meteo: sin datos en esta demo. La comparativa por curva sí está calculada de las trazas demo.';
+  var dtd=document.querySelector('#cards .demotag');
+  if(dtd)dtd.textContent='datos de demostración · trazas sintéticas';
+  var bl1d=document.querySelector('#cards .band .col:nth-child(1) .lab');
+  if(bl1d)bl1d.textContent='Ritmo vs delante';
+  var bl3d=document.querySelector('#cards .band .col:nth-child(3) .lab');
+  if(bl3d)bl3d.textContent='Ritmo vs detras';
   var L=window.LAPS_DEMO,AN=window.AN,T=window.TRACK_MONZA;
   if(!el('cards')||!L||!AN||!T)return;
   var DS2=10;
@@ -85,7 +215,43 @@ function renderCtx(){var t=window.CHAT.memText(),b=el('ctxbar');if(!b)return;
 function boot(){
   drawMap(null);
   renderCards();
-  addMsg('bot','Muro de boxes (demo Monza). Analisis y enrutado sin IA, todo calculo local: pregunta por curvas, frenadas, rivales o vueltas, o charlemos un rato. Los datos son de demostracion; las trazas reales llegarian por la APK, que esta en desarrollo.');
+  setInterval(renderCards,2000);
+  var nat=window.VOICE&&window.VOICE.native&&window.VOICE.native();
+  var inApk=typeof window.Android!=='undefined';
+  /* barra de modo (solo APK): sin datos -> ofrecer demo explicita; demo -> volver a vivo */
+  var mbar=el('modebar'),dbox=el('demo');
+  function paintMode(){
+    if(!inApk||!mbar)return;
+    mbar.style.display='block';
+    var live=!!liveSt(),mode=window.F1MODE();
+    if(mode==='demo'){
+      mbar.style.background='#3a2c00';mbar.style.color='#f5f5f5';
+      mbar.innerHTML='Viendo la DEMOSTRACION (datos sinteticos). '+(live?'<b>Hay datos en directo disponibles.</b> ':'')+'<button id="mb-live" style="background:#123f2a;color:#a7f3c7;border:1px solid #1f6b45;border-radius:6px;padding:3px 8px;margin-left:6px">Ver en directo</button>';
+      if(dbox)dbox.style.display='block';
+    }else if(live){
+      mbar.style.background='#123f2a';mbar.style.color='#a7f3c7';
+      mbar.innerHTML='EN DIRECTO · telemetria del juego <button id="mb-demo" style="background:#3a2c00;color:#ffb340;border:1px solid #6b5a1f;border-radius:6px;padding:3px 8px;margin-left:6px">Ver demostracion</button>';
+      if(dbox)dbox.style.display='none';
+    }else{
+      mbar.style.background='#3a1010';mbar.style.color='#ffb0a7';
+      mbar.innerHTML='SIN DATOS en directo (esperando telemetria del juego, UDP 20777). <button id="mb-demo" style="background:#3a2c00;color:#ffb340;border:1px solid #6b5a1f;border-radius:6px;padding:3px 8px;margin-left:6px">Ver demostracion</button>';
+      if(dbox)dbox.style.display='none';
+    }
+    var bl=el('mb-live');if(bl)bl.addEventListener('click',function(){window.F1SETMODE('live');});
+    var bd=el('mb-demo');if(bd)bd.addEventListener('click',function(){window.F1SETMODE('demo');});
+  }
+  if(mbar){mbar.addEventListener('f1mode',function(){paintMode();renderCards();});}
+  paintMode();
+  setInterval(paintMode,2000);
+  if(nat){
+    var mc=el('mic-consent');
+    if(mc)mc.innerHTML='El micro usa el reconocimiento de voz EN EL DISPOSITIVO: el audio no sale de la tablet. En modo radio la escucha sigue abierta entre preguntas hasta que la cierres con otro toque o diciendo "corta". <button id="mic-yes" style="background:#0a84ff;color:#fff;border:none;border-radius:6px;padding:4px 8px">Entendido, activar micro</button> <button id="mic-no" style="background:#2c2c2e;color:#f5f5f5;border:1px solid #444;border-radius:6px;padding:4px 8px">Ahora no</button>';
+    var vi=el('voice-in');
+    if(vi)vi.title='Reconocimiento en el dispositivo (on-device); el audio no sale de la tablet';
+  }
+  if(inApk&&!liveSt()&&window.F1MODE&&window.F1MODE()!=='demo'){
+    addMsg('bot','Muro de boxes. Estoy esperando la telemetria del juego (UDP 20777): activala en Ajustes > Telemetria del F1 25 con esta IP. Cuando llegue, todo lo que veas sera en directo. Si quieres practicar, toca "Ver demostracion".');}
+  else addMsg('bot','Muro de boxes en demostracion: datos de ejemplo de Monza, no una sesion real. Pregunta por curvas, frenadas, rivales o vueltas, o charlemos. Con la APK y el juego en marcha, "Ver en directo" muestra tu telemetria real.');
   renderCtx();
   addEventListener('storage',function(e){if(e.key==='f1-chat-mem-v1')renderCtx();});
   var rb=el('ctxreset');if(rb)rb.addEventListener('click',function(){window.CHAT.resetMem();renderCtx();addMsg('bot','Contexto reiniciado: empezamos de cero. Pregunta por curvas, frenadas, rivales o vueltas.');});
@@ -116,7 +282,7 @@ function boot(){
         var b=el('btn-radio');
         if(st==='listening'){el('voice-in').textContent='Radio: ON';if(b)b.textContent='🎙 Cerrar radio';}
         else if(st==='idle'){el('voice-in').textContent='Micro';if(b)b.textContent='🎙 Abrir radio';}
-        else if(st==='unsupported'){addMsg('bot','Este navegador no tiene reconocimiento de voz.');radioOff(true);}
+        else if(st==='unsupported'){addMsg('bot',inApk?'Este dispositivo no ofrece reconocimiento de voz en el dispositivo, asi que el micro no esta disponible; puedes seguir escribiendo abajo.':'Este navegador no tiene reconocimiento de voz.');radioOff(true);}
         else if(st.indexOf('error:')===0){addMsg('bot','El micro ha fallado ('+st.slice(6)+'). Sesion cerrada; revisa el permiso de micro del navegador.');radioOff(true);}}});
     if(!session){addMsg('bot','Este navegador no tiene reconocimiento de voz.');return;}
     addMsg('bot','Modo radio abierto: habla cuando quieras, no hace falta tocar nada. Si hablas mientras te contesto, me callo y te escucho. Di "corta" o toca Micro para cerrar.');}
